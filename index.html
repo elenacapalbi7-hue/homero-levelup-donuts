@@ -2,136 +2,110 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Homero Level-up Donuts</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Homero Game Multiverse</title>
     <style>
-        body { 
-            text-align: center; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #222; 
-            color: #fff; 
-            margin: 0;
-            padding: 20px;
-        }
-        #game-box {
-            background: #333;
-            border: 5px solid #ff69b4;
-            border-radius: 25px;
-            padding: 20px;
-            max-width: 400px;
-            margin: 0 auto;
-            box-shadow: 0 0 20px rgba(255, 105, 180, 0.5);
-        }
-        .stats-panel {
-            display: flex;
-            justify-content: space-around;
-            background: #444;
-            border-radius: 15px;
-            padding: 10px;
-            margin-bottom: 20px;
-        }
-        .stat { font-weight: bold; color: #ffeb3b; font-size: 1.2rem; }
-        
-        #game-title {
-            color: #00ff00;
-            font-size: 1.1rem;
-            min-height: 50px;
-            margin-bottom: 20px;
-        }
-
-        .dona-btn {
-            font-size: 100px;
-            cursor: pointer;
-            user-select: none;
-            transition: transform 0.1s;
-            display: inline-block;
-            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
-        }
-        .dona-btn:active { transform: scale(0.8); }
-
-        .progress-bar {
-            width: 100%;
-            height: 10px;
-            background: #555;
-            border-radius: 5px;
-            margin-top: 15px;
-            overflow: hidden;
-        }
-        #progress-fill {
-            width: 0%;
-            height: 100%;
-            background: #ff69b4;
-            transition: width 0.3s;
-        }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        #canvas { display: block; background: #5c94fa; margin: 0 auto; border: 4px solid #fff; }
+        #ui-overlay { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; }
+        .hud { background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; display: inline-block; }
+        #controles { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 20px; }
+        .btn { width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; user-select: none; }
     </style>
 </head>
 <body>
 
-    <h1>🍩 HOMERO LEVEL-UP 🍩</h1>
-
-    <div id="game-box">
-        <div class="stats-panel">
-            <div>Nivel: <span id="lvl-num" class="stat">1</span></div>
-            <div>Donas: <span id="dona-num" class="stat">0</span></div>
-        </div>
-
-        <div id="game-title">Juego Actual: <br><strong>Street Fighter II</strong></div>
-
-        <div class="dona-btn" onclick="comerDona()">🍩</div>
-
-        <div class="progress-bar">
-            <div id="progress-fill"></div>
-        </div>
-        <p style="font-size: 0.8rem; color: #aaa;">¡Come 10 donas para el siguiente nivel!</p>
+<div id="ui-overlay">
+    <div class="hud">
+        Nivel: <span id="lvl">1</span> | <span id="game-name">Street Fighter</span><br>
+        Donas: <span id="donas">0</span>/10
     </div>
+</div>
 
-    <script>
-        let donasTotales = 0;
-        let nivelActual = 0;
-        
-        // La lista de 25 juegos que armamos
-        const listaJuegos = [
-            "Street Fighter II", "Mortal Kombat II", "The Simpsons Arcade", "Metal Slug", 
-            "Double Dragon", "Cadillacs and Dinosaurs", "Super Mario World", "Sonic 2", 
-            "Donkey Kong Country", "Castlevania: SOTN", "Mega Man X", "Pac-Man", 
-            "Donkey Kong (1981)", "Galaga", "Space Invaders", "Tetris", 
-            "Super Mario Kart", "Daytona USA", "NBA Jam", "ISS Deluxe", 
-            "Zelda: Ocarina of Time", "Final Fantasy VII", "Doom", "Star Fox", "Chrono Trigger"
-        ];
+<canvas id="canvas"></canvas>
 
-        function comerDona() {
-            donasTotales++;
-            
-            // Actualizar números en pantalla
-            document.getElementById('dona-num').innerText = donasTotales;
-            
-            // Calcular progreso de la barra (0% a 100%)
-            let progreso = (donasTotales % 10) * 10;
-            document.getElementById('progress-fill').style.width = progreso + "%";
+<div id="controles">
+    <div class="btn" id="btn-izq">⬅️</div>
+    <div class="btn" id="btn-saltar">⬆️</div>
+    <div class="btn" id="btn-der">➡️</div>
+</div>
 
-            // Lógica de Level Up cada 10 donas
-            if (donasTotales % 10 === 0) {
-                subirNivel();
-            }
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight * 0.7;
+
+let nivel = 0;
+let donasRecolectadas = 0;
+const listaJuegos = ["Street Fighter", "Mario World", "Sonic", "Pac-Man", "Doom"]; // Agregaremos los 25
+
+// Propiedades de Homero (El Jugador)
+let homero = { x: 50, y: canvas.height - 70, w: 40, h: 60, dy: 0, saltando: false, speed: 5 };
+let donas = [];
+
+function crearDona() {
+    donas.push({ x: Math.random() * (canvas.width - 30), y: -30, size: 30 });
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // DIBUJAR JUGADOR (Caja amarilla temporal hasta que subas la foto)
+    ctx.fillStyle = "#FFD700";
+    ctx.fillRect(homero.x, homero.y, homero.w, homero.h);
+    ctx.fillStyle = "#000";
+    ctx.fillText("HOMERO", homero.x, homero.y + 30);
+
+    // Lógica de Gravedad básica
+    homero.y += homero.dy;
+    if (homero.y + homero.h < canvas.height) {
+        homero.dy += 0.8;
+    } else {
+        homero.y = canvas.height - homero.h;
+        homero.dy = 0;
+        homero.saltando = false;
+    }
+
+    // DIBUJAR Y MOVER DONAS
+    ctx.font = "30px Arial";
+    donas.forEach((d, index) => {
+        d.y += 3 + nivel; // Caen más rápido cada nivel
+        ctx.fillText("🍩", d.x, d.y);
+
+        // Colisión con Homero
+        if (d.x < homero.x + homero.w && d.x + 30 > homero.x && d.y < homero.y + homero.h && d.y + 30 > homero.y) {
+            donas.splice(index, 1);
+            donasRecolectadas++;
+            document.getElementById('donas').innerText = donasRecolectadas;
+            if(donasRecolectadas >= 10) subirNivel();
         }
+    });
 
-        function subirNivel() {
-            nivelActual++;
-            
-            if (nivelActual < listaJuegos.length) {
-                document.getElementById('lvl-num').innerText = nivelActual + 1;
-                document.getElementById('game-title').innerHTML = "Juego Desbloqueado: <br><strong>" + listaJuegos[nivelActual] + "</strong>";
-                document.getElementById('progress-fill').style.width = "0%";
-                
-                // Efecto visual simple
-                document.getElementById('game-box').style.borderColor = "#00ff00";
-                setTimeout(() => {
-                    document.getElementById('game-box').style.borderColor = "#ff69b4";
-                }, 500);
-            } else {
-                alert("¡FELICIDADES! Homero completó todos los niveles y comió muchísimas donas.");
-            }
-        }
-    </script>
+    requestAnimationFrame(update);
+}
+
+function subirNivel() {
+    nivel++;
+    donasRecolectadas = 0;
+    document.getElementById('donas').innerText = "0";
+    document.getElementById('lvl').innerText = nivel + 1;
+    document.getElementById('game-name').innerText = listaJuegos[nivel] || "Siguiente Reto";
+    donas = [];
+    alert("¡Nivel " + nivel + " completado! Próximo juego: " + listaJuegos[nivel]);
+}
+
+// Controles Móviles
+document.getElementById('btn-izq').ontouchstart = () => { homero.x -= 20; };
+document.getElementById('btn-der').ontouchstart = () => { homero.x += 20; };
+document.getElementById('btn-saltar').ontouchstart = () => { 
+    if(!homero.saltando) { homero.dy = -15; homero.saltando = true; } 
+};
+
+// Generar donas cada segundo
+setInterval(crearDona, 1500);
+update();
+
+</script>
 </body>
 </html>
