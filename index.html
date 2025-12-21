@@ -3,23 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero Multiverse RPG</title>
+    <title>Homero RPG Multiverse</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; touch-action: none; }
-        canvas { display: block; }
-        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; }
+        body { margin: 0; background: #000; color: #fff; font-family: monospace; overflow: hidden; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 10; }
         .hud { background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid #ff69b4; border-radius: 10px; display: inline-block; }
-        #game-info { color: #00ffea; font-size: 1.1rem; font-weight: bold; }
-        #instr { font-size: 0.8rem; color: #ffff00; }
     </style>
 </head>
 <body>
 
 <div id="ui">
     <div class="hud">
-        <div id="game-info">Nivel 1: Pokémon Red</div>
+        <div id="game-info" style="color:#00ffea; font-weight:bold;">Nivel 1: Pokémon Red</div>
         Donas: <span id="donas">0</span>/10<br>
-        <span id="instr">¡Atrapa las Pokebolas!</span>
+        <span id="instr" style="color:#ff0; font-size:12px;">¡Desliza para atrapar Pokebolas!</span>
     </div>
 </div>
 
@@ -28,54 +26,102 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+
+// Forzar tamaño correcto en el celular
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
 
 let nivel = 0;
 let donasTotal = 0;
 let items = [];
-let jugador = { x: canvas.width/2, y: canvas.height - 100, w: 50, h: 80 };
-let touchX = canvas.width/2;
-let touchY = canvas.height - 100;
+let jugador = { x: canvas.width/2 - 25, y: canvas.height - 120, w: 50, h: 80 };
 
 const listaJuegos = [
     { nombre: "Pokémon Red/Blue", color: "#78C850", instr: "Atrapa las Pokebolas" },
-    { nombre: "Diablo II", color: "#2a0000", instr: "¡Esquiva el fuego y busca la dona!" },
-    { nombre: "Final Fantasy VI", color: "#000033", instr: "Las donas caen rápido, ¡muévete!" },
-    { nombre: "Earthbound", color: "#ffcc00", instr: "¡Cuidado! Todo se mueve raro" },
-    { nombre: "Dragon Quest V", color: "#4169E1", instr: "Atrapa el slime para ganar donas" }
+    { nombre: "Diablo II", color: "#2a0000", instr: "¡Esquiva el fuego!" },
+    { nombre: "Final Fantasy VI", color: "#000033", instr: "¡Donas veloces!" },
+    { nombre: "Earthbound", color: "#ffcc00", instr: "¡Movimiento Loco!" },
+    { nombre: "Dragon Quest V", color: "#4169E1", instr: "¡Atrapa los Slimes!" }
 ];
 
+// Control táctil mejorado
 window.addEventListener('touchmove', (e) => {
     e.preventDefault();
-    touchX = e.touches[0].clientX - jugador.w/2;
-    touchY = e.touches[0].clientY - jugador.h/2;
+    let touch = e.touches[0];
+    jugador.x = touch.clientX - jugador.w/2;
+    if (nivel >= 1) jugador.y = touch.clientY - jugador.h/2;
 }, { passive: false });
 
 function crearItem() {
-    let speedBase = 3 + nivel;
     items.push({
         x: Math.random() * (canvas.width - 40),
         y: -50,
-        vx: nivel === 3 ? (Math.random() - 0.5) * 10 : 0, // Movimiento loco en Earthbound
-        speed: speedBase,
-        icono: obtenerIcono()
+        vx: nivel === 3 ? (Math.random() - 0.5) * 6 : 0,
+        speed: 4 + nivel,
+        icono: (nivel===0?"🔘":(nivel===1?"🔥":(nivel===2?"💎":(nivel===3?"👁️":"💧"))))
     });
 }
 
-function obtenerIcono() {
-    if (nivel === 0) return "🔘"; // Pokebola
-    if (nivel === 1) return "🔥"; // Fuego Diablo
-    if (nivel === 2) return "💎"; // Cristal FF
-    if (nivel === 3) return "👁️"; // Ojo Earthbound
-    return "💧"; // Slime Dragon Quest
-}
-
 function loop() {
-    // Fondo dinámico
+    // Dibujar Fondo
     ctx.fillStyle = listaJuegos[nivel].color;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Movimiento de Homero
-    jugador.x += (touchX - jugador.x) * 0.2;
-    if (nivel >= 1) { // En Diablo y superiores se mueve en todo
+    // Dibujar Homero (Cuadro Amarillo con borde)
+    ctx.fillStyle = "#FFD700";
+    ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
+    ctx.strokeStyle = "white";
+    ctx.strokeRect(jugador.x, jugador.y, jugador.w, jugador.h);
+
+    // Dibujar Items
+    ctx.font = "30px Arial";
+    for (let i = items.length - 1; i >= 0; i--) {
+        let it = items[i];
+        it.y += it.speed;
+        it.x += it.vx;
+
+        ctx.fillText(it.icono, it.x, it.y);
+        ctx.fillText("🍩", it.x, it.y + 35);
+
+        // Colisión mejorada
+        if (it.x < jugador.x + jugador.w && it.x + 30 > jugador.x &&
+            it.y < jugador.y + jugador.h && it.y + 30 > jugador.y) {
+            items.splice(i, 1);
+            ganarDona();
+        }
+
+        // Limpiar si caen
+        if (it.y > canvas.height) items.splice(i, 1);
+    }
+    requestAnimationFrame(loop);
+}
+
+function ganarDona() {
+    donasTotal++;
+    document.getElementById('donas').innerText = donasTotal;
+    if (donasTotal >= 10) {
+        nivel++;
+        donasTotal = 0;
+        document.getElementById('donas').innerText = "0";
+        items = [];
+        if (nivel < 5) {
+            document.getElementById('game-info').innerText = "Nivel " + (nivel+1) + ": " + listaJuegos[nivel].nombre;
+            document.getElementById('instr').innerText = listaJuegos[nivel].instr;
+            alert("¡Pasaste a " + listaJuegos[nivel].nombre + "!");
+        } else {
+            alert("¡Felicidades! Completaste los primeros 5.");
+            nivel = 0;
+        }
+    }
+}
+
+// Iniciar
+setInterval(crearItem, 1000);
+loop();
+</script>
+</body>
+</html>
