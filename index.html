@@ -3,41 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero RPG Multiverse</title>
+    <title>Homero Multiverse RPG</title>
     <style>
-        body { margin: 0; background: #1a1a1a; color: #fff; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; }
-        canvas { display: block; background: #3d3d3d; }
-        #ui {
-            position: absolute;
-            top: 10px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            pointer-events: none;
-        }
-        .hud {
-            background: rgba(0,0,0,0.8);
-            padding: 10px 15px;
-            border-radius: 15px;
-            display: inline-block;
-            border: 2px solid #ff69b4;
-            box-shadow: 0 0 10px #ff69b4;
-        }
-        .game-title { color: #00ffea; font-weight: bold; font-size: 1.1rem; display: block; margin-bottom: 5px; }
-        .stats { color: #fff; font-size: 0.9rem; }
-        #msg { color: #ffff00; font-size: 0.8rem; margin-top: 5px; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; touch-action: none; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; }
+        .hud { background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid #ff69b4; border-radius: 10px; display: inline-block; }
+        #game-info { color: #00ffea; font-size: 1.1rem; font-weight: bold; }
+        #instr { font-size: 0.8rem; color: #ffff00; }
     </style>
 </head>
 <body>
 
 <div id="ui">
     <div class="hud">
-        <span id="game-name" class="game-title">Pokémon Red/Blue</span>
-        <div class="stats">
-            Nivel: <span id="lvl">1</span>/25 | 
-            Donas: <span id="donas">0</span>/10
-        </div>
-        <div id="msg">¡Desliza para mover a Homero!</div>
+        <div id="game-info">Nivel 1: Pokémon Red</div>
+        Donas: <span id="donas">0</span>/10<br>
+        <span id="instr">¡Atrapa las Pokebolas!</span>
     </div>
 </div>
 
@@ -46,136 +28,54 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let nivelIdx = 0;
-let donasRecolectadas = 0;
+let nivel = 0;
+let donasTotal = 0;
+let items = [];
+let jugador = { x: canvas.width/2, y: canvas.height - 100, w: 50, h: 80 };
+let touchX = canvas.width/2;
+let touchY = canvas.height - 100;
 
-// Tu lista exacta de 25 juegos
 const listaJuegos = [
-    "Pokémon Red/Blue", "Diablo II", "Final Fantasy VI", "Earthbound", 
-    "Dragon Quest V", "Secret of Mana", "Kingdom Hearts", "Hollow Knight", 
-    "Castlevania: Aria of Sorrow", "Bloodstained: Ritual of the Night", "Dead Cells", 
-    "Banjo-Kazooie", "Spyro the Dragon", "Crash Bandicoot 3: Warped", 
-    "Ratchet & Clank", "Jak and Daxter", "Hades", "Vampire Survivors", 
-    "The Binding of Isaac", "Enter the Gungeon", "Wonder Boy in Monster World", 
-    "Kirby’s Adventure", "Paper Mario", "Super Adventure Island II", 
-    "The Legend of Zelda: A Link to the Past"
+    { nombre: "Pokémon Red/Blue", color: "#78C850", instr: "Atrapa las Pokebolas" },
+    { nombre: "Diablo II", color: "#2a0000", instr: "¡Esquiva el fuego y busca la dona!" },
+    { nombre: "Final Fantasy VI", color: "#000033", instr: "Las donas caen rápido, ¡muévete!" },
+    { nombre: "Earthbound", color: "#ffcc00", instr: "¡Cuidado! Todo se mueve raro" },
+    { nombre: "Dragon Quest V", color: "#4169E1", instr: "Atrapa el slime para ganar donas" }
 ];
-
-// Colores de fondo para simular cambio de juego
-const coloresFondo = ["#78C850", "#4A0000", "#4B0082", "#FF69B4", "#4169E1", "#32CD32", "#1E90FF", "#2F4F4F", "#800000", "#483D8B"];
-
-let jugador = {
-    x: canvas.width / 2 - 25,
-    y: canvas.height - 120,
-    w: 60,
-    h: 90,
-    color: "#FFD700" // Amarillo Simpson
-};
-
-let donas = [];
-let touchX = jugador.x;
-
-// Control Táctil (Mover el dedo en cualquier parte)
-window.addEventListener('touchstart', (e) => {
-    touchX = e.touches[0].clientX - jugador.w / 2;
-});
 
 window.addEventListener('touchmove', (e) => {
     e.preventDefault();
-    touchX = e.touches[0].clientX - jugador.w / 2;
+    touchX = e.touches[0].clientX - jugador.w/2;
+    touchY = e.touches[0].clientY - jugador.h/2;
 }, { passive: false });
 
-function crearDona() {
-    donas.push({
+function crearItem() {
+    let speedBase = 3 + nivel;
+    items.push({
         x: Math.random() * (canvas.width - 40),
         y: -50,
-        velocidad: 4 + (nivelIdx * 0.4) // Aumenta velocidad según nivel
+        vx: nivel === 3 ? (Math.random() - 0.5) * 10 : 0, // Movimiento loco en Earthbound
+        speed: speedBase,
+        icono: obtenerIcono()
     });
 }
 
-function dibujar() {
-    // Color de fondo dinámico
-    ctx.fillStyle = coloresFondo[nivelIdx % coloresFondo.length];
+function obtenerIcono() {
+    if (nivel === 0) return "🔘"; // Pokebola
+    if (nivel === 1) return "🔥"; // Fuego Diablo
+    if (nivel === 2) return "💎"; // Cristal FF
+    if (nivel === 3) return "👁️"; // Ojo Earthbound
+    return "💧"; // Slime Dragon Quest
+}
+
+function loop() {
+    // Fondo dinámico
+    ctx.fillStyle = listaJuegos[nivel].color;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Suavizado de movimiento de Homero
+    // Movimiento de Homero
     jugador.x += (touchX - jugador.x) * 0.2;
-
-    // Límites de pantalla
-    if (jugador.x < 0) jugador.x = 0;
-    if (jugador.x > canvas.width - jugador.w) jugador.x = canvas.width - jugador.w;
-
-    // Dibujar Jugador (Homero temporal)
-    ctx.fillStyle = jugador.color;
-    ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(jugador.x, jugador.y, jugador.w, jugador.h);
-    
-    // Texto de Homero
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 12px Arial";
-    ctx.fillText("HOMERO", jugador.x + 5, jugador.y + 45);
-
-    // Dibujar y mover Donas
-    ctx.font = "45px Arial";
-    for (let i = donas.length - 1; i >= 0; i--) {
-        let d = donas[i];
-        d.y += d.velocidad;
-        ctx.fillText("🍩", d.x, d.y);
-
-        // Colisión (Homero atrapa la dona)
-        if (d.x < jugador.x + jugador.w && 
-            d.x + 40 > jugador.x && 
-            d.y > jugador.y && 
-            d.y < jugador.y + jugador.h) {
-            
-            donas.splice(i, 1);
-            sumarPunto();
-        }
-
-        // Limpieza si sale de pantalla
-        if (d.y > canvas.height) donas.splice(i, 1);
-    }
-
-    requestAnimationFrame(dibujar);
-}
-
-function sumarPunto() {
-    donasRecolectadas++;
-    document.getElementById('donas').innerText = donasRecolectadas;
-    
-    if (donasRecolectadas >= 10) {
-        subirNivel();
-    }
-}
-
-function subirNivel() {
-    nivelIdx++;
-    donasRecolectadas = 0;
-    document.getElementById('donas').innerText = "0";
-    
-    if (nivelIdx < listaJuegos.length) {
-        document.getElementById('lvl').innerText = nivelIdx + 1;
-        document.getElementById('game-name').innerText = listaJuegos[nivelIdx];
-        alert("¡LEVEL UP!\nHas desbloqueado: " + listaJuegos[nivelIdx]);
-    } else {
-        alert("¡INCREÍBLE! Completaste los 25 juegos del multiverso.");
-        nivelIdx = 0;
-        document.getElementById('lvl').innerText = "1";
-        document.getElementById('game-name').innerText = listaJuegos[0];
-    }
-}
-
-// Generador de donas
-setInterval(crearDona, 1000);
-
-// Iniciar
-dibujar();
-</script>
-</body>
-</html>
+    if (nivel >= 1) { // En Diablo y superiores se mueve en todo
