@@ -3,21 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero Multiverso Real</title>
+    <title>Homero: 5 Juegos en 1</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; overflow: hidden; touch-action: none; }
-        canvas { display: block; }
-        #ui { position: absolute; top: 10px; width: 100%; text-align: center; z-index: 10; pointer-events: none; }
-        .hud { background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid #ff69b4; display: inline-block; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 100; }
+        .hud { background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid #ff69b4; display: inline-block; border-radius: 10px; }
+        #controles-fps { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: center; z-index: 200; }
+        .btn-fire { width: 80px; height: 80px; background: red; border-radius: 50%; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
     </style>
 </head>
 <body>
 
 <div id="ui">
     <div class="hud">
-        <div id="info-juego">NIVEL 1: POKÉMON</div>
-        <div id="stats">Donas: 0/10</div>
+        <strong id="lvl-name">Nivel 1: RITMO (Obstáculos)</strong><br>
+        Donas: <span id="puntos">0</span>/10
     </div>
+</div>
+
+<div id="controles-fps">
+    <div class="btn-fire" id="fire-btn">¡PUM!</div>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -28,130 +34,204 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let nivelActual = 1;
+let nivel = 1;
 let puntos = 0;
+let frame = 0;
 let items = [];
-let jugador = { x: 100, y: 100, w: 40, h: 50 };
-let touch = { x: 100, y: 100 };
+let jugador = { x: 50, y: 0, w: 40, h: 60, vy: 0, saltando: false, hp: 100 };
+let toque = { x: 0, y: 0, activo: false };
 
-// Captura de toque universal
-window.addEventListener('touchstart', (e) => { touch.x = e.touches[0].clientX; touch.y = e.touches[0].clientY; });
-window.addEventListener('touchmove', (e) => { e.preventDefault(); touch.x = e.touches[0].clientX; touch.y = e.touches[0].clientY; }, {passive:false});
+// --- CONTROLES UNIVERSALES ---
+window.addEventListener('touchstart', (e) => {
+    toque.activo = true;
+    let t = e.touches[0];
+    toque.x = t.clientX; toque.y = t.clientY;
+    
+    // Lógica de salto para Nivel 1 y 4
+    if((nivel === 1 || nivel === 4) && !jugador.saltando) {
+        jugador.vy = -15;
+        jugador.saltando = true;
+    }
+    // Disparo para Nivel 5
+    if(nivel === 5) dispararFPS();
+});
 
-function actualizar() {
+window.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    let t = e.touches[0];
+    toque.x = t.clientX; toque.y = t.clientY;
+    // Movimiento libre en Nivel 2
+    if(nivel === 2) {
+        jugador.x = toque.x - 20;
+        jugador.y = toque.y - 30;
+    }
+}, {passive: false});
+
+// --- MOTOR PRINCIPAL ---
+function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
 
-    if (nivelActual === 1) { 
-        juegoPokemon(); 
-    } else if (nivelActual === 2) { 
-        juegoDiablo(); 
-    } else if (nivelActual === 3) { 
-        juegoFinalFantasy(); 
-    }
+    if (nivel === 1) juegoRitmico();
+    else if (nivel === 2) juegoSupervivencia();
+    else if (nivel === 3) juegoTurnos();
+    else if (nivel === 4) juegoPlataformas();
+    else if (nivel === 5) juegoShooter();
 
-    requestAnimationFrame(actualizar);
+    requestAnimationFrame(loop);
 }
 
-// --- NIVEL 1: POKÉMON (RPG de buscar) ---
-let donaPos = { x: 200, y: 200 };
-function juegoPokemon() {
-    ctx.fillStyle = "#78C850"; // Verde hierba
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+// --- 1. JUEGO RÍTMICO (Obstáculos) ---
+function juegoRitmico() {
+    ctx.fillStyle = "#111"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    ctx.fillStyle = "#ff69b4"; ctx.fillRect(0, canvas.height-50, canvas.width, 50); // Suelo rosa
     
-    // Movimiento RPG
-    jugador.x += (touch.x - jugador.x) * 0.1;
-    jugador.y += (touch.y - jugador.y) * 0.1;
+    // Gravedad
+    jugador.vy += 0.8; jugador.y += jugador.vy;
+    if(jugador.y > canvas.height-110) { jugador.y = canvas.height-110; jugador.vy = 0; jugador.saltando = false; }
     
-    ctx.fillStyle = "yellow"; // Homero
-    ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
-    
-    ctx.font = "30px Arial";
-    ctx.fillText("🍩", donaPos.x, donaPos.y);
+    // Obstáculos rítmicos
+    if(frame % 90 === 0) items.push({x: canvas.width, y: canvas.height-90, w: 30, h: 40, tipo: 'obs'});
+    if(frame % 120 === 0) items.push({x: canvas.width, y: canvas.height-150, tipo: 'dona'});
 
-    if (Math.hypot(jugador.x - donaPos.x, jugador.y - donaPos.y) < 40) {
-        puntos++;
-        document.getElementById('stats').innerText = `Donas: ${puntos}/10`;
-        donaPos = { x: Math.random()*(canvas.width-50), y: Math.random()*(canvas.height-100)+50 };
-        if (puntos >= 10) siguienteNivel();
-    }
+    dibujarItemsYColision((it) => {
+        if(it.tipo === 'obs') { puntos = 0; items = []; alert("¡D'oh! Perdiste el ritmo."); }
+        else { ganarPunto(); }
+    });
+    dibujarHomero();
 }
 
-// --- NIVEL 2: DIABLO II (Esquivar Proyectiles) ---
-let proyectiles = [];
-function juegoDiablo() {
-    ctx.fillStyle = "#200"; // Rojo infierno
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+// --- 2. SURVIVOR POST-APOCALÍPTICO (Mundo Abierto) ---
+function juegoSupervivencia() {
+    ctx.fillStyle = "#332211"; ctx.fillRect(0,0,canvas.width, canvas.height); // Tierra
+    ctx.font = "20px Arial"; ctx.fillText("Zombis acercándose...", 20, canvas.height-20);
+    
+    if(frame % 60 === 0) items.push({x: Math.random()*canvas.width, y: -50, tipo: 'zombi', s: 2});
+    if(frame % 150 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, tipo: 'dona'});
 
-    jugador.x += (touch.x - jugador.x) * 0.1;
-    jugador.y += (touch.y - jugador.y) * 0.1;
-
-    ctx.fillStyle = "yellow";
-    ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
-
-    if (Math.random() < 0.05) proyectiles.push({x: Math.random()*canvas.width, y: 0, s: 5});
-
-    proyectiles.forEach((p, i) => {
-        p.y += p.s;
-        ctx.fillText("🔥", p.x, p.y);
-        if (Math.hypot(jugador.x - p.x, jugador.y - p.y) < 30) {
-            puntos = 0; // Si te queman pierdes las donas del nivel
-            proyectiles = [];
-            document.getElementById('stats').innerText = `Donas: 0/10`;
-            alert("¡TE QUEMASTE! Reiniciando nivel...");
+    items.forEach((it, i) => {
+        if(it.tipo === 'zombi') {
+            let dx = jugador.x - it.x; let dy = jugador.y - it.y;
+            let dist = Math.hypot(dx, dy);
+            it.x += (dx/dist)*it.s; it.y += (dy/dist)*it.s;
+            ctx.fillText("🧟", it.x, it.y);
+        } else { ctx.fillText("🍩", it.x, it.y); }
+        
+        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 40) {
+            if(it.tipo === 'zombi') { puntos = 0; items = []; alert("¡Te atraparon!"); }
+            else { items.splice(i, 1); ganarPunto(); }
         }
     });
+    dibujarHomero();
+}
+
+// --- 3. RPG POR TURNOS (Fantasía) ---
+let enemigoHP = 100;
+function juegoTurnos() {
+    ctx.fillStyle = "#000044"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    ctx.fillStyle = "white"; ctx.font = "20px Arial";
+    ctx.fillText("HOMBRE DE PIEDRA HP: " + enemigoHP, 50, 100);
+    ctx.fillText("TU TURNO: ¡TOCA AL ENEMIGO!", 50, canvas.height-100);
     
-    // Aquí la dona aparece rara vez
-    if (Math.random() < 0.01) {
-        ctx.fillText("🍩", Math.random()*canvas.width, Math.random()*canvas.height);
-        puntos++; // En este nivel ganas puntos por sobrevivir
-        document.getElementById('stats').innerText = `Puntos: ${puntos}/10`;
-        if (puntos >= 10) siguienteNivel();
-    }
-}
-
-// --- NIVEL 3: FINAL FANTASY (Toque Rápido / Reflejos) ---
-let cristal = { x: 100, y: 100, activo: false };
-function juegoFinalFantasy() {
-    ctx.fillStyle = "#005"; // Azul FF
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "80px Arial"; ctx.fillText("🧌", canvas.width/2-40, canvas.height/2);
     
-    ctx.fillStyle = "white";
-    ctx.font = "15px Arial";
-    ctx.fillText("¡TOCA EL CRISTAL RÁPIDO!", 50, 200);
-
-    if (!cristal.activo) {
-        cristal.x = Math.random() * (canvas.width - 60);
-        cristal.y = Math.random() * (canvas.height - 100);
-        cristal.activo = true;
+    if(toque.activo && Math.hypot(toque.x - canvas.width/2, toque.y - canvas.height/2) < 100) {
+        enemigoHP -= 10;
+        toque.activo = false;
+        ganarPunto();
+        if(enemigoHP <= 0) { enemigoHP = 100; alert("¡Enemigo derrotado!"); }
     }
+    dibujarHomero();
+}
 
-    ctx.fillText("💎", cristal.x, cristal.y);
+// --- 4. PLATAFORMAS CLÁSICO ---
+function juegoPlataformas() {
+    ctx.fillStyle = "#5c94fa"; ctx.fillRect(0,0,canvas.width, canvas.height); // Cielo
+    ctx.fillStyle = "#1d7d1d"; ctx.fillRect(0, canvas.height-40, canvas.width, 40); // Pasto
+    
+    jugador.vy += 0.8; jugador.y += jugador.vy;
+    if(jugador.y > canvas.height-100) { jugador.y = canvas.height-100; jugador.vy = 0; jugador.saltando = false; }
+    
+    if(frame % 100 === 0) items.push({x: canvas.width, y: canvas.height-150, tipo: 'dona'});
+    
+    items.forEach((it, i) => {
+        it.x -= 4;
+        ctx.fillText("🍩", it.x, it.y);
+        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 40) { items.splice(i,1); ganarPunto(); }
+    });
+    dibujarHomero();
+}
 
-    // Si tocas el cristal con el dedo directamente
-    if (Math.hypot(touch.x - cristal.x, touch.y - cristal.y) < 50) {
-        cristal.activo = false;
-        puntos++;
-        document.getElementById('stats').innerText = `Cristales: ${puntos}/10`;
-        touch.x = -100; // Reset toque
-        if (puntos >= 10) siguienteNivel();
+// --- 5. SHOOTER TÁCTICO (FPS) ---
+let mira = { x: 0, y: 0 };
+function juegoShooter() {
+    ctx.fillStyle = "#222"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    document.getElementById('controles-fps').style.display = 'flex';
+    
+    mira.x = toque.x; mira.y = toque.y;
+    
+    if(frame % 40 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, tipo: 'target', r: 30});
+    
+    items.forEach((it, i) => {
+        ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI*2);
+        ctx.fillStyle = "red"; ctx.fill();
+        ctx.fillStyle = "white"; ctx.fillText("🍩", it.x-15, it.y+10);
+    });
+    
+    // Dibujar mira
+    ctx.strokeStyle = "lime"; ctx.lineWidth = 2;
+    ctx.strokeRect(mira.x-20, mira.y-20, 40, 40);
+}
+
+function dispararFPS() {
+    items.forEach((it, i) => {
+        if(Math.hypot(toque.x - it.x, toque.y - it.y) < 40) {
+            items.splice(i, 1);
+            ganarPunto();
+        }
+    });
+}
+
+// --- FUNCIONES AUXILIARES ---
+function dibujarHomero() {
+    ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 60);
+    ctx.strokeRect(jugador.x, jugador.y, 40, 60);
+}
+
+function dibujarItemsYColision(callback) {
+    for(let i=items.length-1; i>=0; i--) {
+        let it = items[i]; it.x -= 5;
+        ctx.font = "30px Arial";
+        ctx.fillText(it.tipo === 'obs' ? "🌵" : "🍩", it.x, it.y);
+        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 40) {
+            items.splice(i, 1);
+            callback(it);
+        }
+        if(it.x < -50) items.splice(i, 1);
     }
 }
 
-function siguienteNivel() {
-    nivelActual++;
-    puntos = 0;
-    document.getElementById('stats').innerText = `Donas: 0/10`;
-    if (nivelActual === 2) {
-        document.getElementById('info-juego').innerText = "NIVEL 2: DIABLO II";
-        alert("¡NIVEL 2! Ahora esquiva el fuego para sobrevivir.");
-    } else if (nivelActual === 3) {
-        document.getElementById('info-juego').innerText = "NIVEL 3: FINAL FANTASY";
-        alert("¡NIVEL 3! Toca los cristales antes de que desaparezcan.");
-    }
+function ganarPunto() {
+    puntos++;
+    document.getElementById('puntos').innerText = puntos;
+    if(puntos >= 10) subirNivel();
 }
 
-actualizar();
+function subirNivel() {
+    nivel++; puntos = 0; items = [];
+    document.getElementById('puntos').innerText = "0";
+    if(nivel > 5) { alert("¡MAESTRO DEL MULTIVERSO!"); nivel = 1; }
+    
+    const titulos = [
+        "", "Nivel 1: RITMO", "Nivel 2: SURVIVOR", 
+        "Nivel 3: RPG (Turnos)", "Nivel 4: PLATAFORMAS", "Nivel 5: SHOOTER"
+    ];
+    document.getElementById('lvl-name').innerText = titulos[nivel];
+    document.getElementById('controles-fps').style.display = 'none';
+    alert("Cargando " + titulos[nivel] + "...");
+}
+
+loop();
 </script>
 </body>
 </html>
