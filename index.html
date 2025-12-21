@@ -3,27 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero: 5 Juegos en 1</title>
+    <title>Homero Multiverso Pro</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
         #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 100; }
-        .hud { background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid #ff69b4; display: inline-block; border-radius: 10px; }
-        #controles-fps { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: center; z-index: 200; }
-        .btn-fire { width: 80px; height: 80px; background: red; border-radius: 50%; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+        .hud { background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid #ff69b4; border-radius: 10px; display: inline-block; }
     </style>
 </head>
 <body>
 
 <div id="ui">
     <div class="hud">
-        <strong id="lvl-name">Nivel 1: RITMO (Obstáculos)</strong><br>
+        <strong id="lvl-name">Nivel 1: RITMO</strong><br>
         Donas: <span id="puntos">0</span>/10
     </div>
-</div>
-
-<div id="controles-fps">
-    <div class="btn-fire" id="fire-btn">¡PUM!</div>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -38,21 +32,21 @@ let nivel = 1;
 let puntos = 0;
 let frame = 0;
 let items = [];
-let jugador = { x: 50, y: 0, w: 40, h: 60, vy: 0, saltando: false, hp: 100 };
+let jugador = { x: 50, y: 0, w: 40, h: 60, vy: 0, saltos: 0 };
 let toque = { x: 0, y: 0, activo: false };
 
-// --- CONTROLES UNIVERSALES ---
+// --- CONTROLES TÁCTILES ---
 window.addEventListener('touchstart', (e) => {
     toque.activo = true;
     let t = e.touches[0];
     toque.x = t.clientX; toque.y = t.clientY;
     
-    // Lógica de salto para Nivel 1 y 4
-    if((nivel === 1 || nivel === 4) && !jugador.saltando) {
-        jugador.vy = -15;
-        jugador.saltando = true;
+    // Doble Salto (Nivel 1 y 4 de plataformas)
+    if((nivel === 1) && jugador.saltos < 2) {
+        jugador.vy = -12;
+        jugador.saltos++;
     }
-    // Disparo para Nivel 5
+    if(nivel === 3) intentarAtaqueRPG();
     if(nivel === 5) dispararFPS();
 });
 
@@ -60,14 +54,14 @@ window.addEventListener('touchmove', (e) => {
     e.preventDefault();
     let t = e.touches[0];
     toque.x = t.clientX; toque.y = t.clientY;
-    // Movimiento libre en Nivel 2
-    if(nivel === 2) {
+    
+    // Movimiento en niveles de libertad total
+    if(nivel === 2 || nivel === 4 || nivel === 5) {
         jugador.x = toque.x - 20;
         jugador.y = toque.y - 30;
     }
 }, {passive: false});
 
-// --- MOTOR PRINCIPAL ---
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     frame++;
@@ -75,160 +69,132 @@ function loop() {
     if (nivel === 1) juegoRitmico();
     else if (nivel === 2) juegoSupervivencia();
     else if (nivel === 3) juegoTurnos();
-    else if (nivel === 4) juegoPlataformas();
+    else if (nivel === 4) juegoNave();
     else if (nivel === 5) juegoShooter();
 
     requestAnimationFrame(loop);
 }
 
-// --- 1. JUEGO RÍTMICO (Obstáculos) ---
+// 1. RITMO (Doble Salto)
 function juegoRitmico() {
-    ctx.fillStyle = "#111"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    ctx.fillStyle = "#ff69b4"; ctx.fillRect(0, canvas.height-50, canvas.width, 50); // Suelo rosa
-    
-    // Gravedad
-    jugador.vy += 0.8; jugador.y += jugador.vy;
-    if(jugador.y > canvas.height-110) { jugador.y = canvas.height-110; jugador.vy = 0; jugador.saltando = false; }
-    
-    // Obstáculos rítmicos
-    if(frame % 90 === 0) items.push({x: canvas.width, y: canvas.height-90, w: 30, h: 40, tipo: 'obs'});
-    if(frame % 120 === 0) items.push({x: canvas.width, y: canvas.height-150, tipo: 'dona'});
-
-    dibujarItemsYColision((it) => {
-        if(it.tipo === 'obs') { puntos = 0; items = []; alert("¡D'oh! Perdiste el ritmo."); }
-        else { ganarPunto(); }
-    });
+    ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    ctx.fillStyle = "#ff69b4"; ctx.fillRect(0, canvas.height-50, canvas.width, 50);
+    jugador.vy += 0.7; jugador.y += jugador.vy;
+    if(jugador.y > canvas.height-110) { jugador.y = canvas.height-110; jugador.vy = 0; jugador.saltos = 0; }
+    if(frame % 100 === 0) items.push({x: canvas.width, y: canvas.height-90, tipo: 'obs'});
+    if(frame % 130 === 0) items.push({x: canvas.width, y: canvas.height-200, tipo: 'dona'});
+    actualizarItems(5);
     dibujarHomero();
 }
 
-// --- 2. SURVIVOR POST-APOCALÍPTICO (Mundo Abierto) ---
+// 2. SURVIVOR (Velocidad Ajustada)
 function juegoSupervivencia() {
-    ctx.fillStyle = "#332211"; ctx.fillRect(0,0,canvas.width, canvas.height); // Tierra
-    ctx.font = "20px Arial"; ctx.fillText("Zombis acercándose...", 20, canvas.height-20);
-    
-    if(frame % 60 === 0) items.push({x: Math.random()*canvas.width, y: -50, tipo: 'zombi', s: 2});
+    ctx.fillStyle = "#2d3436"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    if(frame % 80 === 0) items.push({x: Math.random()*canvas.width, y: -50, tipo: 'zombi', s: 1.5}); // Velocidad reducida
     if(frame % 150 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, tipo: 'dona'});
-
     items.forEach((it, i) => {
         if(it.tipo === 'zombi') {
-            let dx = jugador.x - it.x; let dy = jugador.y - it.y;
-            let dist = Math.hypot(dx, dy);
-            it.x += (dx/dist)*it.s; it.y += (dy/dist)*it.s;
+            let angle = Math.atan2(jugador.y - it.y, jugador.x - it.x);
+            it.x += Math.cos(angle) * it.s; it.y += Math.sin(angle) * it.s;
             ctx.fillText("🧟", it.x, it.y);
-        } else { ctx.fillText("🍩", it.x, it.y); }
-        
-        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 40) {
-            if(it.tipo === 'zombi') { puntos = 0; items = []; alert("¡Te atraparon!"); }
-            else { items.splice(i, 1); ganarPunto(); }
+        } else ctx.fillText("🍩", it.x, it.y);
+        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 35) {
+            if(it.tipo === 'zombi') { puntos=0; items=[]; alert("¡Perdiste!"); }
+            else { items.splice(i,1); ganarPunto(); }
         }
     });
     dibujarHomero();
 }
 
-// --- 3. RPG POR TURNOS (Fantasía) ---
+// 3. RPG (Mecánica de Barra de Energía)
+let energiaRPG = 0;
 let enemigoHP = 100;
 function juegoTurnos() {
-    ctx.fillStyle = "#000044"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    ctx.fillStyle = "white"; ctx.font = "20px Arial";
-    ctx.fillText("HOMBRE DE PIEDRA HP: " + enemigoHP, 50, 100);
-    ctx.fillText("TU TURNO: ¡TOCA AL ENEMIGO!", 50, canvas.height-100);
+    ctx.fillStyle = "#2c3e50"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    if(energiaRPG < 100) energiaRPG += 0.5;
+    
+    ctx.fillStyle = "gray"; ctx.fillRect(50, 50, canvas.width-100, 20);
+    ctx.fillStyle = "lime"; ctx.fillRect(50, 50, (energiaRPG/100)*(canvas.width-100), 20);
+    ctx.fillStyle = "white"; ctx.fillText("ENERGÍA PARA ATACAR", 50, 45);
+    ctx.fillText("ENEMIGO HP: " + enemigoHP, 50, 90);
     
     ctx.font = "80px Arial"; ctx.fillText("🧌", canvas.width/2-40, canvas.height/2);
-    
-    if(toque.activo && Math.hypot(toque.x - canvas.width/2, toque.y - canvas.height/2) < 100) {
-        enemigoHP -= 10;
-        toque.activo = false;
+    if(energiaRPG >= 100) ctx.fillText("¡LISTO!", canvas.width/2-40, canvas.height/2+100);
+    dibujarHomero();
+}
+
+function intentarAtaqueRPG() {
+    if(energiaRPG >= 100) {
+        enemigoHP -= 20;
+        energiaRPG = 0;
         ganarPunto();
-        if(enemigoHP <= 0) { enemigoHP = 100; alert("¡Enemigo derrotado!"); }
+        if(enemigoHP <= 0) { enemigoHP = 100; alert("¡Derrotado!"); }
     }
-    dibujarHomero();
 }
 
-// --- 4. PLATAFORMAS CLÁSICO ---
-function juegoPlataformas() {
-    ctx.fillStyle = "#5c94fa"; ctx.fillRect(0,0,canvas.width, canvas.height); // Cielo
-    ctx.fillStyle = "#1d7d1d"; ctx.fillRect(0, canvas.height-40, canvas.width, 40); // Pasto
-    
-    jugador.vy += 0.8; jugador.y += jugador.vy;
-    if(jugador.y > canvas.height-100) { jugador.y = canvas.height-100; jugador.vy = 0; jugador.saltando = false; }
-    
-    if(frame % 100 === 0) items.push({x: canvas.width, y: canvas.height-150, tipo: 'dona'});
+// 4. NAVE (Nuevo: Scroll Vertical)
+function juegoNave() {
+    ctx.fillStyle = "#000011"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    if(frame % 40 === 0) items.push({x: Math.random()*canvas.width, y: -50, tipo: 'meteoro', s: 6});
+    if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: -50, tipo: 'dona', s: 4});
     
     items.forEach((it, i) => {
-        it.x -= 4;
-        ctx.fillText("🍩", it.x, it.y);
-        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 40) { items.splice(i,1); ganarPunto(); }
+        it.y += it.s;
+        ctx.font = "30px Arial";
+        ctx.fillText(it.tipo === 'meteoro' ? "☄️" : "🍩", it.x, it.y);
+        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 40) {
+            if(it.tipo === 'meteoro') { puntos=0; items=[]; alert("¡Nave destruida!"); }
+            else { items.splice(i,1); ganarPunto(); }
+        }
     });
+    // Dibujar Homero con "fuego" abajo
+    ctx.fillStyle = "orange"; ctx.fillRect(jugador.x+10, jugador.y+60, 20, 20);
     dibujarHomero();
 }
 
-// --- 5. SHOOTER TÁCTICO (FPS) ---
-let mira = { x: 0, y: 0 };
+// 5. SHOOTER (FPS)
 function juegoShooter() {
-    ctx.fillStyle = "#222"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    document.getElementById('controles-fps').style.display = 'flex';
-    
-    mira.x = toque.x; mira.y = toque.y;
-    
-    if(frame % 40 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, tipo: 'target', r: 30});
-    
-    items.forEach((it, i) => {
-        ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI*2);
-        ctx.fillStyle = "red"; ctx.fill();
-        ctx.fillStyle = "white"; ctx.fillText("🍩", it.x-15, it.y+10);
-    });
-    
-    // Dibujar mira
-    ctx.strokeStyle = "lime"; ctx.lineWidth = 2;
-    ctx.strokeRect(mira.x-20, mira.y-20, 40, 40);
+    ctx.fillStyle = "#1a1a1a"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    ctx.strokeStyle = "red"; ctx.strokeRect(toque.x-25, toque.y-25, 50, 50); // Mira
+    if(frame % 50 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, tipo: 'blanco'});
+    items.forEach(it => { ctx.font="40px Arial"; ctx.fillText("🎯", it.x, it.y); });
 }
 
 function dispararFPS() {
     items.forEach((it, i) => {
-        if(Math.hypot(toque.x - it.x, toque.y - it.y) < 40) {
-            items.splice(i, 1);
-            ganarPunto();
-        }
+        if(Math.hypot(toque.x-it.x, toque.y-it.y) < 50) { items.splice(i,1); ganarPunto(); }
     });
 }
 
-// --- FUNCIONES AUXILIARES ---
+// --- UTILIDADES ---
+function actualizarItems(vel) {
+    for(let i=items.length-1; i>=0; i--) {
+        items[i].x -= vel;
+        ctx.font = "30px Arial";
+        ctx.fillText(items[i].tipo === 'obs' ? "🌵" : "🍩", items[i].x, items[i].y);
+        if(Math.hypot(jugador.x-items[i].x, jugador.y-items[i].y) < 40) {
+            if(items[i].tipo === 'obs') { puntos=0; items=[]; alert("¡D'oh!"); }
+            else { items.splice(i,1); ganarPunto(); }
+        }
+    }
+}
+
 function dibujarHomero() {
     ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 60);
     ctx.strokeRect(jugador.x, jugador.y, 40, 60);
 }
 
-function dibujarItemsYColision(callback) {
-    for(let i=items.length-1; i>=0; i--) {
-        let it = items[i]; it.x -= 5;
-        ctx.font = "30px Arial";
-        ctx.fillText(it.tipo === 'obs' ? "🌵" : "🍩", it.x, it.y);
-        if(Math.hypot(jugador.x-it.x, jugador.y-it.y) < 40) {
-            items.splice(i, 1);
-            callback(it);
-        }
-        if(it.x < -50) items.splice(i, 1);
-    }
-}
-
 function ganarPunto() {
-    puntos++;
-    document.getElementById('puntos').innerText = puntos;
+    puntos++; document.getElementById('puntos').innerText = puntos;
     if(puntos >= 10) subirNivel();
 }
 
 function subirNivel() {
     nivel++; puntos = 0; items = [];
-    document.getElementById('puntos').innerText = "0";
-    if(nivel > 5) { alert("¡MAESTRO DEL MULTIVERSO!"); nivel = 1; }
-    
-    const titulos = [
-        "", "Nivel 1: RITMO", "Nivel 2: SURVIVOR", 
-        "Nivel 3: RPG (Turnos)", "Nivel 4: PLATAFORMAS", "Nivel 5: SHOOTER"
-    ];
-    document.getElementById('lvl-name').innerText = titulos[nivel];
-    document.getElementById('controles-fps').style.display = 'none';
-    alert("Cargando " + titulos[nivel] + "...");
+    if(nivel > 5) nivel = 1;
+    const n = ["", "Nivel 1: RITMO", "Nivel 2: SURVIVOR", "Nivel 3: RPG ESTRATEGIA", "Nivel 4: NAVE ESPACIAL", "Nivel 5: SHOOTER"];
+    document.getElementById('lvl-name').innerText = n[nivel];
+    alert("¡Cargando " + n[nivel] + "!");
 }
 
 loop();
