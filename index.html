@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homero Level-up Donuts</title>
+    <style>
+        body { 
+            text-align: center; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #222; 
+            color: #fff; 
+            margin: 0;
+            padding: 20px;
+        }
+        #game-box {
+            background: #333;
+            border: 5px solid #ff69b4;
+            border-radius: 25px;
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(255, 105, 180, 0.5);
+        }
+        .stats-panel {
+            display: flex;
+            justify-content: space-around;
+            background: #444;
+            border-radius: 15px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .stat { font-weight: bold; color: #ffeb3b; font-size: 1.2rem; }
+        
+        #game-title {
+            color: #00ff00;
+            font-size: 1.1rem;
+            min-height: 50px;
+            margin-bottom: 20px;
+        }
+
+        .dona-btn {
+            font-size: 100px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s;
+            display: inline-block;
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
+        }
+        .dona-btn:active { transform: scale(0.8); }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: #555;
+            border-radius: 5px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+        #progress-fill {
+            width: 0%;
+            height: 100%;
+            background: #ff69b4;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🍩 HOMERO LEVEL-UP 🍩</h1>
+
+    <div id="game-box">
+        <div class="stats-panel">
+            <div>Nivel: <span id="lvl-num" class="stat">1</span></div>
+            <div>Donas: <span id="dona-num" class="stat">0</span></div>
+        </div>
+
+        <div id="game-title">Juego Actual: <br><strong>Street Fighter II</strong></div>
+
+        <div class="dona-btn" onclick="comerDona()">🍩</div>
+
+        <div class="progress-bar">
+            <div id="progress-fill"></div>
+        </div>
+        <p style="font-size: 0.8rem; color: #aaa;">¡Come 10 donas para el siguiente nivel!</p>
+    </div>
+
+    <script>
+        let donasTotales = 0;
+        let nivelActual = 0;
+        
+        // La lista de 25 juegos que armamos
+        const listaJuegos = [
+            "Street Fighter II", "Mortal Kombat II", "The Simpsons Arcade", "Metal Slug", 
+            "Double Dragon", "Cadillacs and Dinosaurs", "Super Mario World", "Sonic 2", 
+            "Donkey Kong Country", "Castlevania: SOTN", "Mega Man X", "Pac-Man", 
+            "Donkey Kong (1981)", "Galaga", "Space Invaders", "Tetris", 
+            "Super Mario Kart", "Daytona USA", "NBA Jam", "ISS Deluxe", 
+            "Zelda: Ocarina of Time", "Final Fantasy VII", "Doom", "Star Fox", "Chrono Trigger"
+        ];
+
+        function comerDona() {
+            donasTotales++;
+            
+            // Actualizar números en pantalla
+            document.getElementById('dona-num').innerText = donasTotales;
+            
+            // Calcular progreso de la barra (0% a 100%)
+            let progreso = (donasTotales % 10) * 10;
+            document.getElementById('progress-fill').style.width = progreso + "%";
+
+            // Lógica de Level Up cada 10 donas
+            if (donasTotales % 10 === 0) {
+                subirNivel();
+            }
+        }
+
+        function subirNivel() {
+            nivelActual++;
+            
+            if (nivelActual < listaJuegos.length) {
+                document.getElementById('lvl-num').innerText = nivelActual + 1;
+                document.getElementById('game-title').innerHTML = "Juego Desbloqueado: <br><strong>" + listaJuegos[nivelActual] + "</strong>";
+                document.getElementById('progress-fill').style.width = "0%";
+                
+                // Efecto visual simple
+                document.getElementById('game-box').style.borderColor = "#00ff00";
+                setTimeout(() => {
+                    document.getElementById('game-box').style.borderColor = "#ff69b4";
+                }, 500);
+            } else {
+                alert("¡FELICIDADES! Homero completó todos los niveles y comió muchísimas donas.");
+            }
+        }
+    </script>
+</body>
+</html>
