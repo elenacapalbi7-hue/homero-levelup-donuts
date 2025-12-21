@@ -3,21 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero Multiverse RPG</title>
+    <title>Homero Multiverso Real</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; touch-action: none; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 100; }
-        .hud { background: rgba(0,0,0,0.9); padding: 10px; border: 2px solid #ff69b4; border-radius: 10px; display: inline-block; }
-        #game-info { color: #00ffea; font-weight: bold; }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; z-index: 10; pointer-events: none; }
+        .hud { background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid #ff69b4; display: inline-block; }
     </style>
 </head>
 <body>
 
 <div id="ui">
     <div class="hud">
-        <div id="game-info">NIVEL 1: POKÉMON (Exploración)</div>
-        Objetivo: <span id="mision">Busca la dona en la hierba</span> | <span id="progreso">0/10</span>
+        <div id="info-juego">NIVEL 1: POKÉMON</div>
+        <div id="stats">Donas: 0/10</div>
     </div>
 </div>
 
@@ -29,101 +28,130 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let nivelActual = 0;
+let nivelActual = 1;
 let puntos = 0;
-let jugador = { x: canvas.width/2, y: canvas.height/2, w: 40, h: 60 };
-let objetivo = { x: 100, y: 100 };
-let obstaculos = [];
+let items = [];
+let jugador = { x: 100, y: 100, w: 40, h: 50 };
+let touch = { x: 100, y: 100 };
 
-// Lista de juegos con sus mecánicas
-const juegos = [
-    { n: "POKÉMON RED", m: "EXPLORACIÓN TIPO RPG", c: "#78C850" },
-    { n: "DIABLO II", m: "ESQUIVAR PROYECTILES", c: "#300" },
-    { n: "FINAL FANTASY VI", m: "COMBATE POR TURNOS (TAP)", c: "#000055" },
-    { n: "EARTHBOUND", m: "RITMO Y REFLEJOS", c: "#f0f" },
-    { n: "DRAGON QUEST V", m: "LABERINTO", c: "#4169E1" }
-];
+// Captura de toque universal
+window.addEventListener('touchstart', (e) => { touch.x = e.touches[0].clientX; touch.y = e.touches[0].clientY; });
+window.addEventListener('touchmove', (e) => { e.preventDefault(); touch.x = e.touches[0].clientX; touch.y = e.touches[0].clientY; }, {passive:false});
 
-// Captura de toque para mover al personaje
-window.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    let tx = e.touches[0].clientX;
-    let ty = e.touches[0].clientY;
-    
-    // En Nivel 1 y 5 (RPG/Laberinto) el personaje sigue al dedo en 4 direcciones
-    jugador.x += (tx - jugador.x) * 0.1;
-    jugador.y += (ty - jugador.y) * 0.1;
-}, { passive: false });
+function actualizar() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-function resetObjetivo() {
-    objetivo.x = Math.random() * (canvas.width - 50);
-    objetivo.y = Math.random() * (canvas.height - 150) + 50;
+    if (nivelActual === 1) { 
+        juegoPokemon(); 
+    } else if (nivelActual === 2) { 
+        juegoDiablo(); 
+    } else if (nivelActual === 3) { 
+        juegoFinalFantasy(); 
+    }
+
+    requestAnimationFrame(actualizar);
 }
 
-function loop() {
-    ctx.fillStyle = juegos[nivelActual].c;
+// --- NIVEL 1: POKÉMON (RPG de buscar) ---
+let donaPos = { x: 200, y: 200 };
+function juegoPokemon() {
+    ctx.fillStyle = "#78C850"; // Verde hierba
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Movimiento RPG
+    jugador.x += (touch.x - jugador.x) * 0.1;
+    jugador.y += (touch.y - jugador.y) * 0.1;
+    
+    ctx.fillStyle = "yellow"; // Homero
+    ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
+    
+    ctx.font = "30px Arial";
+    ctx.fillText("🍩", donaPos.x, donaPos.y);
+
+    if (Math.hypot(jugador.x - donaPos.x, jugador.y - donaPos.y) < 40) {
+        puntos++;
+        document.getElementById('stats').innerText = `Donas: ${puntos}/10`;
+        donaPos = { x: Math.random()*(canvas.width-50), y: Math.random()*(canvas.height-100)+50 };
+        if (puntos >= 10) siguienteNivel();
+    }
+}
+
+// --- NIVEL 2: DIABLO II (Esquivar Proyectiles) ---
+let proyectiles = [];
+function juegoDiablo() {
+    ctx.fillStyle = "#200"; // Rojo infierno
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // MECÁNICA SEGÚN NIVEL
-    if (nivelActual === 0) { // POKÉMON: Explorar
-        ctx.fillStyle = "rgba(0,0,0,0.2)";
-        for(let i=0; i<canvas.width; i+=40) ctx.fillRect(i, 0, 1, canvas.height); // Rejilla RPG
-    } 
-    
-    if (nivelActual === 1) { // DIABLO: Lluvia de fuego
-        if (Math.random() < 0.05) obstaculos.push({x: canvas.width, y: Math.random()*canvas.height, s: 5});
-        ctx.fillStyle = "orange";
-        obstaculos.forEach((o, i) => {
-            o.x -= o.s;
-            ctx.fillText("🔥", o.x, o.y);
-            // Si te toca el fuego, pierdes puntos
-            if(Math.abs(o.x - jugador.x) < 20 && Math.abs(o.y - jugador.y) < 20) {
-                puntos = Math.max(0, puntos - 0.1);
-                obstaculos.splice(i, 1);
-            }
-        });
-    }
+    jugador.x += (touch.x - jugador.x) * 0.1;
+    jugador.y += (touch.y - jugador.y) * 0.1;
 
-    // Dibujar Jugador (Homero)
-    ctx.fillStyle = "#FFD700";
+    ctx.fillStyle = "yellow";
     ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
-    ctx.strokeRect(jugador.x, jugador.y, jugador.w, jugador.h);
 
-    // Dibujar Dona Objetivo
-    ctx.font = "40px Arial";
-    ctx.fillText("🍩", objetivo.x, objetivo.y);
+    if (Math.random() < 0.05) proyectiles.push({x: Math.random()*canvas.width, y: 0, s: 5});
 
-    // Ver colisión
-    let dist = Math.hypot(jugador.x - objetivo.x, jugador.y - objetivo.y);
-    if (dist < 40) {
-        puntos++;
-        document.getElementById('progreso').innerText = Math.floor(puntos) + "/10";
-        resetObjetivo();
-        if (puntos >= 10) subirNivel();
+    proyectiles.forEach((p, i) => {
+        p.y += p.s;
+        ctx.fillText("🔥", p.x, p.y);
+        if (Math.hypot(jugador.x - p.x, jugador.y - p.y) < 30) {
+            puntos = 0; // Si te queman pierdes las donas del nivel
+            proyectiles = [];
+            document.getElementById('stats').innerText = `Donas: 0/10`;
+            alert("¡TE QUEMASTE! Reiniciando nivel...");
+        }
+    });
+    
+    // Aquí la dona aparece rara vez
+    if (Math.random() < 0.01) {
+        ctx.fillText("🍩", Math.random()*canvas.width, Math.random()*canvas.height);
+        puntos++; // En este nivel ganas puntos por sobrevivir
+        document.getElementById('stats').innerText = `Puntos: ${puntos}/10`;
+        if (puntos >= 10) siguienteNivel();
     }
-
-    requestAnimationFrame(loop);
 }
 
-function subirNivel() {
+// --- NIVEL 3: FINAL FANTASY (Toque Rápido / Reflejos) ---
+let cristal = { x: 100, y: 100, activo: false };
+function juegoFinalFantasy() {
+    ctx.fillStyle = "#005"; // Azul FF
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = "white";
+    ctx.font = "15px Arial";
+    ctx.fillText("¡TOCA EL CRISTAL RÁPIDO!", 50, 200);
+
+    if (!cristal.activo) {
+        cristal.x = Math.random() * (canvas.width - 60);
+        cristal.y = Math.random() * (canvas.height - 100);
+        cristal.activo = true;
+    }
+
+    ctx.fillText("💎", cristal.x, cristal.y);
+
+    // Si tocas el cristal con el dedo directamente
+    if (Math.hypot(touch.x - cristal.x, touch.y - cristal.y) < 50) {
+        cristal.activo = false;
+        puntos++;
+        document.getElementById('stats').innerText = `Cristales: ${puntos}/10`;
+        touch.x = -100; // Reset toque
+        if (puntos >= 10) siguienteNivel();
+    }
+}
+
+function siguienteNivel() {
     nivelActual++;
     puntos = 0;
-    obstaculos = [];
-    document.getElementById('progreso').innerText = "0/10";
-    
-    if (nivelActual < juegos.length) {
-        let j = juegos[nivelActual];
-        document.getElementById('game-info').innerText = "NIVEL " + (nivelActual+1) + ": " + j.n;
-        document.getElementById('mision').innerText = j.m;
-        alert("¡ENTRANDO A " + j.n + "!\nModo: " + j.m);
-    } else {
-        alert("¡Primeros 5 mundos completados!");
-        nivelActual = 0;
+    document.getElementById('stats').innerText = `Donas: 0/10`;
+    if (nivelActual === 2) {
+        document.getElementById('info-juego').innerText = "NIVEL 2: DIABLO II";
+        alert("¡NIVEL 2! Ahora esquiva el fuego para sobrevivir.");
+    } else if (nivelActual === 3) {
+        document.getElementById('info-juego').innerText = "NIVEL 3: FINAL FANTASY";
+        alert("¡NIVEL 3! Toca los cristales antes de que desaparezcan.");
     }
 }
 
-resetObjetivo();
-loop();
+actualizar();
 </script>
 </body>
 </html>
