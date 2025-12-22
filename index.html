@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero Multiverso: Edición Pac-Man</title>
+    <title>Homero: Laberinto y Flappy</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
         #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 100; }
-        .hud { background: rgba(0,0,0,0.9); padding: 12px; border: 2px solid #ff69b4; border-radius: 12px; display: inline-block; min-width: 180px; }
+        .hud { background: rgba(0,0,0,0.9); padding: 10px; border: 2px solid #ff69b4; border-radius: 12px; display: inline-block; }
     </style>
 </head>
 <body>
@@ -16,7 +16,7 @@
 <div id="ui">
     <div class="hud">
         <strong id="lvl-tag">Nivel 1: RITMO</strong><br>
-        Objetivo: <span id="puntos">0</span>/10
+        Donas: <span id="puntos">0</span>/10
     </div>
 </div>
 
@@ -26,18 +26,29 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let nivel = 1, puntos = 0, frame = 0, items = [];
-let jugador = { x: 50, y: 0, vy: 0, saltos: 0, d: 'parado' }; 
-let enemigo = { x: 0, y: 0, s: 2 }; // Para el fantasma del Nivel 3
+let jugador = { x: 100, y: 100, w: 30, h: 40, vy: 0, saltos: 0, d: 'parado' };
+let enemigos = [];
+
+// --- LABERINTO NIVEL 3 ---
+const laberinto = [
+    [1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,1,0,0,0,0,1],
+    [1,0,1,0,1,0,1,1,0,1],
+    [1,0,1,0,0,0,0,1,0,1],
+    [1,0,1,1,1,1,0,1,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1]
+];
+const celdaW = window.innerWidth / 10;
+const celdaH = window.innerHeight / 7;
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
 
 // --- CONTROLES ---
 let touchStartX = 0, touchStartY = 0;
-
 window.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
     if (nivel === 1 && jugador.saltos < 2) { jugador.vy = -14; jugador.saltos++; }
     if (nivel === 4) { jugador.vy = -9; } 
 });
@@ -45,15 +56,12 @@ window.addEventListener('touchstart', (e) => {
 window.addEventListener('touchmove', (e) => {
     e.preventDefault();
     let t = e.touches[0];
+    let dx = t.clientX - touchStartX, dy = t.clientY - touchStartY;
     if (nivel === 3) {
-        let dx = t.clientX - touchStartX, dy = t.clientY - touchStartY;
         if (Math.abs(dx) > Math.abs(dy)) jugador.d = dx > 0 ? 'r' : 'l';
         else jugador.d = dy > 0 ? 'd' : 'u';
     }
-    if (nivel === 2 || nivel === 5) { 
-        jugador.x = t.clientX - 20; 
-        if(nivel === 2) jugador.y = t.clientY - 30; 
-    }
+    if (nivel === 2 || nivel === 5) { jugador.x = t.clientX - 20; if(nivel === 2) jugador.y = t.clientY - 30; }
 }, {passive: false});
 
 // --- MOTORES ---
@@ -65,7 +73,7 @@ function motorRitmo() {
     if(frame % 170 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
     items.forEach((it, i) => {
         it.x -= 5; ctx.font = "35px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
-        if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < (it.t === 'c' ? 25 : 50)) {
+        if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) {
             it.t === 'c' ? reiniciar() : (items.splice(i, 1), sumarPunto());
         }
     });
@@ -74,7 +82,7 @@ function motorRitmo() {
 
 function motorSurvivor() {
     ctx.fillStyle = "#2d3436"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: 'z', s: 1.6});
+    if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: 'z', s: 1.8});
     if(frame % 150 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t: 'd'});
     items.forEach((it, i) => {
         if(it.t === 'z') {
@@ -90,53 +98,64 @@ function motorSurvivor() {
     dibujarHomero();
 }
 
-function motorPacman() { // NIVEL 3 MEJORADO
-    ctx.fillStyle = "#000033"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    // Movimiento Homero
-    if(jugador.d === 'r') jugador.x += 4; if(jugador.d === 'l') jugador.x -= 4;
-    if(jugador.d === 'u') jugador.y -= 4; if(jugador.d === 'd') jugador.y += 4;
-    // Bordes infinitos
-    if(jugador.x < 0) jugador.x = canvas.width; if(jugador.x > canvas.width) jugador.x = 0;
-    if(jugador.y < 0) jugador.y = canvas.height; if(jugador.y > canvas.height) jugador.y = 0;
+function motorPacman() { // NIVEL 3: EL LABERINTO
+    ctx.fillStyle = "#000"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    
+    // Dibujar Paredes
+    ctx.fillStyle = "#00f";
+    laberinto.forEach((fila, r) => {
+        fila.forEach((celda, c) => {
+            if(celda === 1) ctx.fillRect(c*celdaW, r*celdaH, celdaW, celdaH);
+        });
+    });
 
-    // Nelson (Fantasma) perseguiendo
-    let ang = Math.atan2(jugador.y - enemigo.y, jugador.x - enemigo.x);
-    enemigo.x += Math.cos(ang) * enemigo.s; enemigo.y += Math.sin(ang) * enemigo.s;
-    ctx.font = "40px Arial"; ctx.fillText("👦", enemigo.x, enemigo.y); // Nelson
-    if(Math.hypot(jugador.x - enemigo.x, jugador.y - enemigo.y) < 35) reiniciar();
+    // Movimiento con colisión
+    let nx = jugador.x, ny = jugador.y;
+    if(jugador.d === 'r') nx += 3; if(jugador.d === 'l') nx -= 3;
+    if(jugador.d === 'u') ny -= 3; if(jugador.d === 'd') ny += 3;
 
-    if(frame % 60 === 0) items.push({x: 30+Math.random()*(canvas.width-60), y: 30+Math.random()*(canvas.height-60), t: 'd'});
+    let gridX = Math.floor((nx + 15) / celdaW), gridY = Math.floor((ny + 20) / celdaH);
+    if(laberinto[gridY] && laberinto[gridY][gridX] === 0) { jugador.x = nx; jugador.y = ny; }
+
+    // Enemigo (Flanders / Marge)
+    enemigos.forEach(e => {
+        let a = Math.atan2(jugador.y - e.y, jugador.x - e.x);
+        e.x += Math.cos(a) * 1.5; e.y += Math.sin(a) * 1.5;
+        ctx.fillText("😡", e.x, e.y);
+        if(Math.hypot(jugador.x - e.x, jugador.y - e.y) < 30) reiniciar();
+    });
+
+    if(frame % 100 === 0) items.push({x: 2*celdaW, y: 2*celdaH, t: 'd'}); // Spawner de donas
     items.forEach((it, i) => {
         ctx.fillText("🍩", it.x, it.y);
-        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) { items.splice(i, 1); sumarPunto(); }
+        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) { items.splice(i,1); sumarPunto(); }
     });
     dibujarHomero();
 }
 
-function motorFlappy() { // NIVEL 4 CORREGIDO
+function motorFlappy() { // NIVEL 4: DONAS SIEMPRE VISIBLES
     ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    jugador.vy += 0.5; jugador.y += jugador.vy;
-    jugador.x = 80;
+    jugador.vy += 0.5; jugador.y += jugador.vy; jugador.x = 80;
 
-    if(frame % 90 === 0) {
+    if(frame % 80 === 0) {
         let h = 100 + Math.random() * (canvas.height - 350);
-        items.push({x: canvas.width, y: h, t: 'p', dona: true});
+        items.push({x: canvas.width, y: h, t: 'p', galleta: true});
     }
 
     items.forEach((it, i) => {
         it.x -= 5;
         ctx.fillStyle = "#2ecc71"; 
-        ctx.fillRect(it.x, 0, 60, it.y); // Tubo superior
-        ctx.fillRect(it.x, it.y + 200, 60, canvas.height); // Tubo inferior
+        ctx.fillRect(it.x, 0, 60, it.y);
+        ctx.fillRect(it.x, it.y + 220, 60, canvas.height);
         
-        if(it.dona) {
-            ctx.fillText("🍩", it.x + 15, it.y + 110);
-            if(Math.hypot(jugador.x - (it.x+15), jugador.y - (it.y+110)) < 50) { it.dona = false; sumarPunto(); }
+        if(it.galleta) {
+            ctx.fillText("🍩", it.x + 10, it.y + 110);
+            if(Math.hypot(jugador.x - (it.x+10), jugador.y - (it.y+110)) < 50) {
+                it.galleta = false; sumarPunto();
+            }
         }
-
-        if(jugador.x + 30 > it.x && jugador.x < it.x + 60 && (jugador.y < it.y || jugador.y + 40 > it.y + 200)) reiniciar();
+        if(jugador.x + 30 > it.x && jugador.x < it.x + 60 && (jugador.y < it.y || jugador.y + 40 > it.y + 220)) reiniciar();
     });
-
     if(jugador.y > canvas.height || jugador.y < 0) reiniciar();
     dibujarHomero();
 }
@@ -146,46 +165,33 @@ function motorCatch() {
     jugador.y = canvas.height - 100;
     if(frame % 50 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: Math.random() > 0.2 ? 'b' : 'bomb'});
     items.forEach((it, i) => {
-        it.y += 6;
-        ctx.fillText(it.t === 'b' ? "🍺" : "💣", it.x, it.y);
+        it.y += 6; ctx.fillText(it.t === 'b' ? "🍺" : "💣", it.x, it.y);
         if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 55) {
-            if(it.t === 'bomb') reiniciar();
-            else { items.splice(i, 1); sumarPunto(); }
+            it.t === 'bomb' ? reiniciar() : (items.splice(i, 1), sumarPunto());
         }
     });
     dibujarHomero();
 }
 
-// --- UTILIDADES ---
+// --- CORE ---
 function actualizarFisica(s) {
     jugador.vy += 0.8; jugador.y += jugador.vy;
     if(jugador.y > s) { jugador.y = s; jugador.vy = 0; jugador.saltos = 0; }
 }
-
-function dibujarHomero() {
-    ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 60);
-    ctx.strokeStyle = "white"; ctx.strokeRect(jugador.x, jugador.y, 40, 60);
-}
-
+function dibujarHomero() { ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 30, 40); }
 function sumarPunto() {
     puntos++; document.getElementById('puntos').innerText = puntos;
     if(puntos >= 10) { 
         nivel++; puntos = 0; items = []; frame = 0; 
-        jugador.x = 50; jugador.y = canvas.height/2; jugador.d = 'parado';
-        enemigo = { x: canvas.width, y: canvas.height, s: 2 + (nivel*0.2) };
+        jugador.x = celdaW + 10; jugador.y = celdaH + 10; jugador.d = 'parado';
+        enemigos = nivel === 3 ? [{x: 8*celdaW, y: 5*celdaH}] : [];
         if(nivel > 5) nivel = 1;
         const n = ["", "1: RITMO", "2: SURVIVOR", "3: PAC-MAN", "4: FLAPPY", "5: CATCH"];
         document.getElementById('lvl-tag').innerText = "Nivel " + n[nivel];
-        alert("¡Nivel superado!");
+        alert("¡Siguiente Nivel!");
     }
 }
-
-function reiniciar() { 
-    puntos = 0; items = []; frame = 0; 
-    jugador.x = 50; jugador.y = canvas.height/2; jugador.d = 'parado';
-    enemigo.x = canvas.width; enemigo.y = canvas.height;
-    alert("¡D'oh!"); 
-}
+function reiniciar() { puntos = 0; items = []; frame = 0; alert("¡D'oh!"); nivel = nivel; }
 
 function loop() {
     ctx.clearRect(0,0,canvas.width, canvas.height); frame++;
