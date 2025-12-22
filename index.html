@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero: Pacman Definitivo</title>
+    <title>Homero: Pac-Man Real Maze</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
@@ -15,7 +15,7 @@
 
 <div id="ui">
     <div class="hud">
-        <strong id="lvl-tag">Nivel 1: RITMO</strong><br>
+        <strong id="lvl-tag">Nivel 3: PAC-MAN</strong><br>
         Donas: <span id="puntos">0</span>/10
     </div>
 </div>
@@ -25,25 +25,41 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let nivel = 1, puntos = 0, frame = 0, items = [], pellets = [];
-let jugador = { x: 50, y: 0, w: 40, h: 50, vy: 0, saltos: 0, d: 'parado' };
+let nivel = 3, puntos = 0, frame = 0, items = [], pellets = [];
+// Homero ahora es un cuadrado perfecto basado en el tamaño de la celda
+let jugador = { x: 0, y: 0, w: 0, h: 0, d: 'parado', proximaD: '' };
 let enemigos = [];
 
-// Mapa Pac-Man (1=Pared, 0=Camino)
-const mapa = [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,1,0,0,0,0,0,1],
-    [1,0,1,1,0,1,1,1,0,1,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,1,1,0,1,0,1,0,1,1,0,1],
-    [1,0,0,0,0,1,0,1,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1]
+// EL LABERINTO REAL (Basado en la imagen de Pac-Man clásica)
+// 1 = Pared, 0 = Camino con punto, 2 = Espacio vacío/Casa fantasmas
+const mapaReal = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,0,1],
+    [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+    [1,1,1,1,0,1,1,1,2,1,2,1,1,1,0,1,1,1,1],
+    [1,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,1],
+    [1,1,1,1,0,1,2,1,1,2,1,1,2,1,0,1,1,1,1],
+    [1,0,0,0,0,2,2,1,2,2,2,1,2,2,0,0,0,0,1],
+    [1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
+    [1,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,1],
+    [1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
+    [1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1],
+    [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+    [1,0,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 
-// Coordenadas fijas para las 10 donas (Fila, Columna)
-const donasFijas = [
-    {r:1, c:1}, {r:1, c:5}, {r:1, c:11}, {r:3, c:1}, {r:3, c:6}, 
-    {r:3, c:11}, {r:5, c:1}, {r:5, c:4}, {r:5, c:8}, {r:5, c:11}
+// DONAS EN POSICIONES FIJAS (Pasillos libres de paredes)
+const donasPos = [
+    {r:1, c:1}, {r:1, c:17}, {r:3, c:9}, {r:5, c:4}, {r:5, c:14},
+    {r:13, c:1}, {r:13, c:17}, {r:15, c:7}, {r:19, c:1}, {r:19, c:17}
 ];
 
 let TW, TH;
@@ -51,37 +67,110 @@ let TW, TH;
 function resize() { 
     canvas.width = window.innerWidth; 
     canvas.height = window.innerHeight;
-    TW = canvas.width / 13;
-    TH = canvas.height / 7;
+    TW = canvas.width / 19;
+    TH = (canvas.height * 0.9) / 21; // Reservamos espacio para el HUD
+    jugador.w = TW * 0.8;
+    jugador.h = TW * 0.8; // Cuadrado perfecto
 }
 window.addEventListener('resize', resize); resize();
 
-// --- CONTROLES ---
+// --- CONTROLES (SIN ACELERACIÓN) ---
 let tX = 0, tY = 0;
 window.addEventListener('touchstart', e => {
     tX = e.touches[0].clientX; tY = e.touches[0].clientY;
-    if (nivel === 1 && jugador.saltos < 2) { jugador.vy = -15; jugador.saltos++; }
-    if (nivel === 4) jugador.vy = -9;
 });
 
 window.addEventListener('touchmove', e => {
     e.preventDefault();
     let dx = e.touches[0].clientX - tX, dy = e.touches[0].clientY - tY;
-    if (nivel === 3) {
-        if (Math.abs(dx) > Math.abs(dy)) jugador.d = dx > 0 ? 'r' : 'l';
-        else jugador.d = dy > 0 ? 'd' : 'u';
-    }
-    if (nivel === 2 || nivel === 5) { 
-        jugador.x = e.touches[0].clientX - 20; 
-        if(nivel === 2) jugador.y = e.touches[0].clientY - 30; 
-    }
+    // Solo registramos la intención de giro
+    if (Math.abs(dx) > Math.abs(dy)) jugador.proximaD = dx > 0 ? 'r' : 'l';
+    else jugador.proximaD = dy > 0 ? 'd' : 'u';
 }, {passive: false});
 
-// --- MOTORES ---
+// --- LÓGICA DE COLISIÓN CON PAREDES ---
+function puedeMoverse(nx, ny) {
+    let margin = 2;
+    let puntosDeColision = [
+        {x: nx + margin, y: ny + margin},
+        {x: nx + jugador.w - margin, y: ny + margin},
+        {x: nx + margin, y: ny + jugador.h - margin},
+        {x: nx + jugador.w - margin, y: ny + jugador.h - margin}
+    ];
+    return puntosDeColision.every(p => {
+        let gx = Math.floor(p.x / TW);
+        let gy = Math.floor(p.y / TH);
+        return mapaReal[gy] && mapaReal[gy][gx] !== 1;
+    });
+}
 
+function motorPacman() {
+    ctx.fillStyle = "#000"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    
+    // 1. Dibujar Laberinto (Paredes Azules de la imagen)
+    mapaReal.forEach((fila, r) => {
+        fila.forEach((celda, c) => {
+            if(celda === 1) {
+                ctx.strokeStyle = "#2424ff"; ctx.lineWidth = 2;
+                ctx.strokeRect(c*TW + 2, r*TH + 2, TW - 4, TH - 4);
+            }
+        });
+    });
+
+    // 2. Dibujar y comer puntitos blancos
+    pellets.forEach((p, i) => {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+        if(Math.hypot(jugador.x + jugador.w/2 - p.x, jugador.y + jugador.h/2 - p.y) < 10) pellets.splice(i, 1);
+    });
+
+    // 3. Movimiento Constante (Sin aceleración)
+    let vel = 2.5;
+    let intentoX = jugador.x, intentoY = jugador.y;
+    
+    // Intentar girar si el usuario deslizó
+    if(jugador.proximaD === 'r') { if(puedeMoverse(jugador.x + vel, jugador.y)) jugador.d = 'r'; }
+    if(jugador.proximaD === 'l') { if(puedeMoverse(jugador.x - vel, jugador.y)) jugador.d = 'l'; }
+    if(jugador.proximaD === 'u') { if(puedeMoverse(jugador.x, jugador.y - vel)) jugador.d = 'u'; }
+    if(jugador.proximaD === 'd') { if(puedeMoverse(jugador.x, jugador.y + vel)) jugador.d = 'd'; }
+
+    if(jugador.d === 'r') intentoX += vel;
+    if(jugador.d === 'l') intentoX -= vel;
+    if(jugador.d === 'u') intentoY -= vel;
+    if(jugador.d === 'd') intentoY += vel;
+
+    if(puedeMoverse(intentoX, intentoY)) {
+        jugador.x = intentoX; jugador.y = intentoY;
+    }
+
+    // 4. Enemigos y Colisión Real
+    const iconos = ["👴", "🤡", "👩", "👨‍🔧"];
+    enemigos.forEach((e, i) => {
+        let a = Math.atan2(jugador.y - e.y, jugador.x - e.x);
+        e.x += Math.cos(a)*1.4; e.y += Math.sin(a)*1.4;
+        ctx.font = "25px Arial";
+        ctx.fillText(iconos[i%4], e.x - 10, e.y + 10);
+        // Colisión solo si el icono toca el cuerpo de Homero
+        if(Math.hypot(jugador.x + jugador.w/2 - e.x, jugador.y + jugador.h/2 - e.y) < 20) reiniciar();
+    });
+
+    // 5. Donas Fijas (Ubicadas manualmente en caminos)
+    items.forEach((it, i) => {
+        ctx.font = "20px Arial";
+        ctx.fillText("🍩", it.x - 10, it.y + 10);
+        if(Math.hypot(jugador.x + jugador.w/2 - it.x, jugador.y + jugador.h/2 - it.y) < 25) {
+            items.splice(i, 1); sumarPunto();
+        }
+    });
+
+    // Dibujar Homero (Cuadrado amarillo perfecto)
+    ctx.fillStyle = "yellow";
+    ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
+}
+
+// Motores de otros niveles estabilizados (Niveles 1 y 2 con escala fija)
 function motorRitmo() {
     ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    jugador.w = 40; jugador.h = 60;
     actualizarFisica(canvas.height-110);
     if(frame % 130 === 0) items.push({x: canvas.width, y: canvas.height-95, t: 'c'});
     if(frame % 170 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
@@ -91,7 +180,7 @@ function motorRitmo() {
             it.t === 'c' ? reiniciar() : (items.splice(i, 1), sumarPunto());
         }
     });
-    dibujarHomero();
+    dibujarHomeroGeneral();
 }
 
 function motorSurvivor() {
@@ -108,91 +197,15 @@ function motorSurvivor() {
             if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 60) { items.splice(i, 1); sumarPunto(); }
         }
     });
-    dibujarHomero();
+    dibujarHomeroGeneral();
 }
 
-function motorPacman() {
-    ctx.fillStyle = "#000"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    jugador.w = TW * 0.6; jugador.h = TH * 0.6;
-
-    // Dibujar Laberinto y Pellets (Puntitos)
-    pellets.forEach((p, i) => {
-        ctx.fillStyle = "#fff";
-        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
-        if(Math.hypot(jugador.x + jugador.w/2 - p.x, jugador.y + jugador.h/2 - p.y) < 15) pellets.splice(i, 1);
-    });
-
-    mapa.forEach((fila, r) => {
-        fila.forEach((celda, c) => {
-            if(celda === 1) {
-                ctx.strokeStyle = "#2424ff"; ctx.lineWidth = 3;
-                ctx.strokeRect(c*TW + 5, r*TH + 5, TW - 10, TH - 10);
-            }
-        });
-    });
-
-    // Movimiento con colisión
-    let nx = jugador.x, ny = jugador.y;
-    if(jugador.d === 'r') nx += 4; if(jugador.d === 'l') nx -= 4;
-    if(jugador.d === 'u') ny -= 4; if(jugador.d === 'd') ny += 4;
-
-    let gX = Math.floor((nx + jugador.w/2) / TW), gY = Math.floor((ny + jugador.h/2) / TH);
-    if(mapa[gY] && mapa[gY][gX] === 0) { jugador.x = nx; jugador.y = ny; }
-
-    // Enemigos (Burns, Bob, Patty, Frank)
-    const icons = ["👴", "🤡", "👩", "👨‍🔧"];
-    enemigos.forEach((e, i) => {
-        let a = Math.atan2(jugador.y - e.y, jugador.x - e.x);
-        e.x += Math.cos(a)*1.8; e.y += Math.sin(a)*1.8;
-        ctx.font = "30px Arial"; ctx.fillText(icons[i%4], e.x, e.y);
-        // Colisión real (Solo si se tocan)
-        if(Math.hypot(jugador.x - e.x, jugador.y - e.y) < 25) reiniciar();
-    });
-
-    // Donas Fijas
-    items.forEach((it, i) => {
-        ctx.fillText("🍩", it.x, it.y);
-        if(Math.hypot(jugador.x + jugador.w/2 - it.x, jugador.y + jugador.h/2 - it.y) < 30) {
-            items.splice(i, 1); sumarPunto();
-        }
-    });
-    dibujarHomero();
-}
-
-function motorFlappy() {
-    ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    jugador.vy += 0.5; jugador.y += jugador.vy; jugador.x = 80;
-    if(frame % 90 === 0) items.push({x: canvas.width, y: 150 + Math.random()*(canvas.height-400), t: 'p', dona: true});
-    items.forEach((it, i) => {
-        it.x -= 5;
-        ctx.fillStyle = "#2ecc71"; ctx.fillRect(it.x, 0, 60, it.y); ctx.fillRect(it.x, it.y + 220, 60, canvas.height);
-        if(it.dona) {
-            ctx.fillText("🍩", it.x + 10, it.y + 130);
-            if(Math.hypot(jugador.x - (it.x+10), jugador.y - (it.y+130)) < 50) { it.dona = false; sumarPunto(); }
-        }
-        if(jugador.x + 30 > it.x && jugador.x < it.x + 60 && (jugador.y < it.y || jugador.y + 40 > it.y + 220)) reiniciar();
-    });
-    if(jugador.y > canvas.height || jugador.y < 0) reiniciar();
-    dibujarHomero();
-}
-
-function motorCatch() {
-    ctx.fillStyle = "#34495e"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    jugador.y = canvas.height - 100;
-    if(frame % 50 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: Math.random()>0.2?'b':'bomb'});
-    items.forEach((it, i) => {
-        it.y += 7; ctx.fillText(it.t==='b'?"🍺":"💣", it.x, it.y);
-        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 55) it.t==='bomb'?reiniciar():(items.splice(i,1), sumarPunto());
-    });
-    dibujarHomero();
-}
-
-// --- CORE ---
+// Funciones Core
 function actualizarFisica(s) {
     jugador.vy += 0.8; jugador.y += jugador.vy;
     if(jugador.y > s) { jugador.y = s; jugador.vy = 0; jugador.saltos = 0; }
 }
-function dibujarHomero() { ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h); }
+function dibujarHomeroGeneral() { ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 50); }
 
 function sumarPunto() {
     puntos++; document.getElementById('puntos').innerText = puntos;
@@ -206,14 +219,15 @@ function sumarPunto() {
 function prepararNivel() {
     document.getElementById('lvl-tag').innerText = "Nivel " + nivel;
     if(nivel === 3) {
-        jugador.x = TW + 10; jugador.y = TH + 10;
-        enemigos = [{x: 11*TW, y: TH}, {x: 11*TW, y: 5*TH}, {x: TW, y: 5*TH}, {x: 6*TW, y: 3*TH}];
-        // Generar puntitos de decoración
-        mapa.forEach((fila, r) => { fila.forEach((celda, c) => {
+        jugador.x = TW + 2; jugador.y = TH + 2;
+        jugador.d = 'parado'; jugador.proximaD = '';
+        enemigos = [{x: 9*TW, y: 10*TH}, {x: 2*TW, y: 19*TH}, {x: 16*TW, y: 19*TH}, {x: 16*TW, y: 1*TH}];
+        // Llenar puntitos blancos
+        mapaReal.forEach((fila, r) => { fila.forEach((celda, c) => {
             if(celda === 0) pellets.push({x: c*TW + TW/2, y: r*TH + TH/2});
         });});
-        // Colocar 10 donas fijas
-        donasFijas.forEach(pos => items.push({x: pos.c*TW + TW/2, y: pos.r*TH + TH/2}));
+        // Colocar 10 donas fijas en el centro de las celdas de camino
+        donasPos.forEach(p => items.push({x: p.c*TW + TW/2, y: p.r*TH + TH/2}));
     } else {
         jugador.x = 80; jugador.y = canvas.height/2;
     }
@@ -223,8 +237,9 @@ function reiniciar() { alert("¡D'oh!"); puntos = 0; items = []; pellets = []; f
 
 function loop() {
     ctx.clearRect(0,0,canvas.width, canvas.height); frame++;
-    if(nivel===1) motorRitmo(); else if(nivel===2) motorSurvivor(); else if(nivel===3) motorPacman();
-    else if(nivel===4) motorFlappy(); else if(nivel===5) motorCatch();
+    if(nivel===1) motorRitmo(); 
+    else if(nivel===2) motorSurvivor(); 
+    else if(nivel===3) motorPacman();
     requestAnimationFrame(loop);
 }
 prepararNivel(); loop();
