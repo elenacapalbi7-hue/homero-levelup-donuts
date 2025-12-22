@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero: Multiverso Total</title>
+    <title>Homero Multiverso: New Edition</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
         #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 100; }
-        .hud { background: rgba(0,0,0,0.9); padding: 12px; border: 2px solid #ff69b4; border-radius: 12px; display: inline-block; }
+        .hud { background: rgba(0,0,0,0.9); padding: 12px; border: 2px solid #ff69b4; border-radius: 12px; display: inline-block; min-width: 180px; }
     </style>
 </head>
 <body>
@@ -16,7 +16,7 @@
 <div id="ui">
     <div class="hud">
         <strong id="lvl-tag">Nivel 1: RITMO</strong><br>
-        Progreso: <span id="puntos">0</span>/10
+        Puntos: <span id="puntos">0</span>/10
     </div>
 </div>
 
@@ -26,35 +26,47 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let nivel = 1, puntos = 0, frame = 0, items = [];
-let jugador = { x: 50, y: 0, vy: 0, saltos: 0 };
-let energiaRPG = 0, enemigoHP = 100;
+let jugador = { x: 50, y: 0, vy: 0, saltos: 0, d: 'r' }; 
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
 
-// --- INPUTS ---
+// --- CONTROLES ---
 window.addEventListener('touchstart', (e) => {
-    if ((nivel === 1 || nivel === 4) && jugador.saltos < 2) { jugador.vy = -14; jugador.saltos++; }
-    if (nivel === 3 && energiaRPG >= 100) { enemigoHP -= 20; energiaRPG = 0; sumarPunto(); }
-    if (nivel === 5) dispararFPS(e.touches[0].clientX, e.touches[0].clientY);
-});
+    let tx = e.touches[0].clientX;
+    let ty = e.touches[0].clientY;
 
-window.addEventListener('touchmove', (e) => {
-    let t = e.touches[0];
-    if ([2, 4, 5].includes(nivel)) { 
-        jugador.x = t.clientX - 20; 
-        if(nivel !== 4) jugador.y = t.clientY - 30; 
+    if (nivel === 1 && jugador.saltos < 2) { jugador.vy = -14; jugador.saltos++; }
+    if (nivel === 4) { jugador.vy = -10; } // Salto estilo Flappy
+    
+    // Control para Snake (Nivel 3)
+    if (nivel === 3) {
+        if (Math.abs(tx - jugador.x) > Math.abs(ty - jugador.y)) {
+            jugador.d = tx > jugador.x ? 'r' : 'l';
+        } else {
+            jugador.d = ty > jugador.y ? 'd' : 'u';
+        }
     }
 });
 
-// --- MOTORES ---
+window.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    let t = e.touches[0];
+    if (nivel === 2 || nivel === 5) { 
+        jugador.x = t.clientX - 20; 
+        if(nivel === 2) jugador.y = t.clientY - 30; 
+    }
+}, {passive: false});
+
+// --- MOTORES DE JUEGO ---
+
 function motorRitmo() {
     ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width, canvas.height);
     actualizarFisica(canvas.height-110);
-    if(frame % 140 === 0) items.push({x: canvas.width, y: canvas.height-95, t: 'c'});
-    if(frame % 180 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
+    if(frame % 130 === 0) items.push({x: canvas.width, y: canvas.height-95, t: 'c'});
+    if(frame % 170 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
     items.forEach((it, i) => {
-        it.x -= 4; ctx.font = "35px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
+        it.x -= 5; ctx.font = "35px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
         if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < (it.t === 'c' ? 25 : 50)) {
             it.t === 'c' ? reiniciar() : (items.splice(i, 1), sumarPunto());
         }
@@ -64,7 +76,7 @@ function motorRitmo() {
 
 function motorSurvivor() {
     ctx.fillStyle = "#2d3436"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: 'z', s: 1.5});
+    if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: 'z', s: 1.6});
     if(frame % 150 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t: 'd'});
     items.forEach((it, i) => {
         if(it.t === 'z') {
@@ -80,58 +92,93 @@ function motorSurvivor() {
     dibujarHomero();
 }
 
-function motorRPG() {
-    ctx.fillStyle = "#4a2c2a"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    if(energiaRPG < 100) energiaRPG += 0.8;
-    ctx.fillStyle = "lime"; ctx.fillRect(50, 50, (energiaRPG/100)*(canvas.width-100), 15);
-    ctx.font = "100px Arial"; ctx.fillText("🐲", canvas.width/2-50, canvas.height/2);
-    ctx.font = "20px Arial"; ctx.fillText("HP: " + enemigoHP, 50, 100);
-    jugador.x = 60; jugador.y = canvas.height-150; dibujarHomero();
-}
+function motorSnake() { // NUEVO NIVEL 3
+    ctx.fillStyle = "#1b4d3e"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    let speed = 4;
+    if(jugador.d === 'r') jugador.x += speed; if(jugador.d === 'l') jugador.x -= speed;
+    if(jugador.d === 'u') jugador.y -= speed; if(jugador.d === 'd') jugador.y += speed;
+    
+    if(frame % 80 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t: 'd'});
+    
+    // Bordes
+    if(jugador.x < 0 || jugador.x > canvas.width || jugador.y < 0 || jugador.y > canvas.height) reiniciar();
 
-function motorPlataformas() {
-    ctx.fillStyle = "#5c94fa"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    actualizarFisica(canvas.height-100);
-    if(frame % 100 === 0) items.push({x: canvas.width, y: canvas.height-150-Math.random()*100, t: 'd'});
     items.forEach((it, i) => {
-        it.x -= 5; ctx.fillText("🍩", it.x, it.y);
-        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 60) { items.splice(i, 1); sumarPunto(); }
+        ctx.fillText("🍩", it.x, it.y);
+        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) { items.splice(i, 1); sumarPunto(); }
     });
     dibujarHomero();
 }
 
-function motorFPS() {
-    ctx.fillStyle = "#111"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    if(frame % 60 === 0) items.push({x: 50+Math.random()*(canvas.width-100), y: 50+Math.random()*(canvas.height-100)});
-    items.forEach(it => ctx.fillText("🎯", it.x, it.y));
+function motorFlappy() { // NUEVO NIVEL 4
+    ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    jugador.vy += 0.5; jugador.y += jugador.vy;
+    jugador.x = 80;
+
+    if(frame % 90 === 0) {
+        let h = Math.random() * (canvas.height - 200);
+        items.push({x: canvas.width, y: h, t: 'p'}); // Pared/Obstáculo
+    }
+
+    items.forEach((it, i) => {
+        it.x -= 5;
+        ctx.fillStyle = "#2ecc71"; ctx.fillRect(it.x, 0, 50, it.y); // Tubo arriba
+        ctx.fillRect(it.x, it.y + 180, 50, canvas.height); // Tubo abajo
+        
+        if(jugador.x + 30 > it.x && jugador.x < it.x + 50 && (jugador.y < it.y || jugador.y + 40 > it.y + 180)) reiniciar();
+        if(it.x === 20) sumarPunto();
+    });
+
+    if(jugador.y > canvas.height || jugador.y < 0) reiniciar();
+    dibujarHomero();
 }
 
-function dispararFPS(tx, ty) {
-    items.forEach((it, i) => { if(Math.hypot(tx - it.x, ty - it.y) < 70) { items.splice(i,1); sumarPunto(); }});
+function motorCatch() { // NUEVO NIVEL 5
+    ctx.fillStyle = "#34495e"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    jugador.y = canvas.height - 100;
+
+    if(frame % 60 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: Math.random() > 0.2 ? 'b' : 'bomb'});
+    
+    items.forEach((it, i) => {
+        it.y += 5;
+        ctx.fillText(it.t === 'b' ? "🍺" : "💣", it.x, it.y);
+        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 50) {
+            if(it.t === 'bomb') reiniciar();
+            else { items.splice(i, 1); sumarPunto(); }
+        }
+        if(it.y > canvas.height) items.splice(i, 1);
+    });
+    dibujarHomero();
 }
 
-// --- CORE ---
+// --- UTILIDADES ---
 function actualizarFisica(s) {
     jugador.vy += 0.8; jugador.y += jugador.vy;
     if(jugador.y > s) { jugador.y = s; jugador.vy = 0; jugador.saltos = 0; }
 }
-function dibujarHomero() { ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 60); }
+
+function dibujarHomero() {
+    ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 60);
+    ctx.strokeStyle = "white"; ctx.strokeRect(jugador.x, jugador.y, 40, 60);
+}
+
 function sumarPunto() {
     puntos++; document.getElementById('puntos').innerText = puntos;
     if(puntos >= 10) { 
-        nivel++; puntos = 0; items = []; frame = 0; 
+        nivel++; puntos = 0; items = []; frame = 0; jugador.vy = 0;
         if(nivel > 5) nivel = 1;
-        const n = ["", "1: RITMO", "2: SUPERVIVENCIA", "3: RPG", "4: PLATAFORMAS", "5: FPS"];
+        const n = ["", "1: RITMO", "2: SURVIVOR", "3: SNAKE", "4: FLAPPY", "5: CATCH"];
         document.getElementById('lvl-tag').innerText = "Nivel " + n[nivel];
-        alert("¡Nivel Completado! Entrando al " + n[nivel]);
+        alert("¡GENIAL! Siguiente: " + n[nivel]);
     }
 }
+
 function reiniciar() { puntos = 0; items = []; frame = 0; alert("¡D'oh!"); }
 
 function loop() {
     ctx.clearRect(0,0,canvas.width, canvas.height); frame++;
-    if(nivel===1) motorRitmo(); else if(nivel===2) motorSurvivor(); else if(nivel===3) motorRPG();
-    else if(nivel===4) motorPlataformas(); else if(nivel===5) motorFPS();
+    if(nivel===1) motorRitmo(); else if(nivel===2) motorSurvivor(); else if(nivel===3) motorSnake();
+    else if(nivel===4) motorFlappy(); else if(nivel===5) motorCatch();
     requestAnimationFrame(loop);
 }
 loop();
