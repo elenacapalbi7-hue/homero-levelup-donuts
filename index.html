@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero Multiverso: Versión Pro</title>
+    <title>Homero Multiverso: Edición Pac-Man</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
@@ -16,7 +16,7 @@
 <div id="ui">
     <div class="hud">
         <strong id="lvl-tag">Nivel 1: RITMO</strong><br>
-        Puntos: <span id="puntos">0</span>/10
+        Objetivo: <span id="puntos">0</span>/10
     </div>
 </div>
 
@@ -27,36 +27,29 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let nivel = 1, puntos = 0, frame = 0, items = [];
 let jugador = { x: 50, y: 0, vy: 0, saltos: 0, d: 'parado' }; 
+let enemigo = { x: 0, y: 0, s: 2 }; // Para el fantasma del Nivel 3
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
 
-// --- CONTROLES MEJORADOS ---
-let touchStartX = 0;
-let touchStartY = 0;
+// --- CONTROLES ---
+let touchStartX = 0, touchStartY = 0;
 
 window.addEventListener('touchstart', (e) => {
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
-
     if (nivel === 1 && jugador.saltos < 2) { jugador.vy = -14; jugador.saltos++; }
-    if (nivel === 4) { jugador.vy = -10; } 
+    if (nivel === 4) { jugador.vy = -9; } 
 });
 
 window.addEventListener('touchmove', (e) => {
     e.preventDefault();
     let t = e.touches[0];
-    
-    if (nivel === 3) { // Lógica de deslizamiento (Swipe) para Snake
-        let diffX = t.clientX - touchStartX;
-        let diffY = t.clientY - touchStartY;
-        if (Math.abs(diffX) > Math.abs(diffY)) {
-            jugador.d = diffX > 0 ? 'r' : 'l';
-        } else {
-            jugador.d = diffY > 0 ? 'd' : 'u';
-        }
+    if (nivel === 3) {
+        let dx = t.clientX - touchStartX, dy = t.clientY - touchStartY;
+        if (Math.abs(dx) > Math.abs(dy)) jugador.d = dx > 0 ? 'r' : 'l';
+        else jugador.d = dy > 0 ? 'd' : 'u';
     }
-
     if (nivel === 2 || nivel === 5) { 
         jugador.x = t.clientX - 20; 
         if(nivel === 2) jugador.y = t.clientY - 30; 
@@ -97,55 +90,51 @@ function motorSurvivor() {
     dibujarHomero();
 }
 
-function motorSnake() { 
-    ctx.fillStyle = "#1b4d3e"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    let speed = 5;
-    
-    // Movimiento
-    if(jugador.d === 'r') jugador.x += speed; 
-    if(jugador.d === 'l') jugador.x -= speed;
-    if(jugador.d === 'u') jugador.y -= speed; 
-    if(jugador.d === 'd') jugador.y += speed;
-    
-    // Teletransporte de bordes (Para que no pierda al chocar con la pared)
-    if(jugador.x < 0) jugador.x = canvas.width;
-    if(jugador.x > canvas.width) jugador.x = 0;
-    if(jugador.y < 0) jugador.y = canvas.height;
-    if(jugador.y > canvas.height) jugador.y = 0;
+function motorPacman() { // NIVEL 3 MEJORADO
+    ctx.fillStyle = "#000033"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    // Movimiento Homero
+    if(jugador.d === 'r') jugador.x += 4; if(jugador.d === 'l') jugador.x -= 4;
+    if(jugador.d === 'u') jugador.y -= 4; if(jugador.d === 'd') jugador.y += 4;
+    // Bordes infinitos
+    if(jugador.x < 0) jugador.x = canvas.width; if(jugador.x > canvas.width) jugador.x = 0;
+    if(jugador.y < 0) jugador.y = canvas.height; if(jugador.y > canvas.height) jugador.y = 0;
 
-    if(frame % 60 === 0) items.push({x: 50+Math.random()*(canvas.width-100), y: 50+Math.random()*(canvas.height-100), t: 'd'});
+    // Nelson (Fantasma) perseguiendo
+    let ang = Math.atan2(jugador.y - enemigo.y, jugador.x - enemigo.x);
+    enemigo.x += Math.cos(ang) * enemigo.s; enemigo.y += Math.sin(ang) * enemigo.s;
+    ctx.font = "40px Arial"; ctx.fillText("👦", enemigo.x, enemigo.y); // Nelson
+    if(Math.hypot(jugador.x - enemigo.x, jugador.y - enemigo.y) < 35) reiniciar();
 
+    if(frame % 60 === 0) items.push({x: 30+Math.random()*(canvas.width-60), y: 30+Math.random()*(canvas.height-60), t: 'd'});
     items.forEach((it, i) => {
         ctx.fillText("🍩", it.x, it.y);
-        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 45) { items.splice(i, 1); sumarPunto(); }
+        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) { items.splice(i, 1); sumarPunto(); }
     });
-    
-    if(jugador.d === 'parado') {
-        ctx.fillStyle = "white"; ctx.font = "20px Arial";
-        ctx.fillText("DESLIZA PARA MOVER A HOMERO", canvas.width/2-140, canvas.height/2 + 100);
-    }
     dibujarHomero();
 }
 
-function motorFlappy() { 
+function motorFlappy() { // NIVEL 4 CORREGIDO
     ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,canvas.width, canvas.height);
     jugador.vy += 0.5; jugador.y += jugador.vy;
     jugador.x = 80;
 
     if(frame % 90 === 0) {
-        let gap = 200;
-        let h = 100 + Math.random() * (canvas.height - gap - 200);
-        items.push({x: canvas.width, y: h, t: 'p', g: gap});
+        let h = 100 + Math.random() * (canvas.height - 350);
+        items.push({x: canvas.width, y: h, t: 'p', dona: true});
     }
 
     items.forEach((it, i) => {
         it.x -= 5;
         ctx.fillStyle = "#2ecc71"; 
-        ctx.fillRect(it.x, 0, 60, it.y); // Tubo arriba
-        ctx.fillRect(it.x, it.y + it.g, 60, canvas.height); // Tubo abajo
+        ctx.fillRect(it.x, 0, 60, it.y); // Tubo superior
+        ctx.fillRect(it.x, it.y + 200, 60, canvas.height); // Tubo inferior
         
-        if(jugador.x + 30 > it.x && jugador.x < it.x + 60 && (jugador.y < it.y || jugador.y + 40 > it.y + it.g)) reiniciar();
-        if(it.x === 20) sumarPunto();
+        if(it.dona) {
+            ctx.fillText("🍩", it.x + 15, it.y + 110);
+            if(Math.hypot(jugador.x - (it.x+15), jugador.y - (it.y+110)) < 50) { it.dona = false; sumarPunto(); }
+        }
+
+        if(jugador.x + 30 > it.x && jugador.x < it.x + 60 && (jugador.y < it.y || jugador.y + 40 > it.y + 200)) reiniciar();
     });
 
     if(jugador.y > canvas.height || jugador.y < 0) reiniciar();
@@ -182,23 +171,25 @@ function sumarPunto() {
     puntos++; document.getElementById('puntos').innerText = puntos;
     if(puntos >= 10) { 
         nivel++; puntos = 0; items = []; frame = 0; 
-        jugador.x = canvas.width/2; jugador.y = canvas.height/2; jugador.d = 'parado';
+        jugador.x = 50; jugador.y = canvas.height/2; jugador.d = 'parado';
+        enemigo = { x: canvas.width, y: canvas.height, s: 2 + (nivel*0.2) };
         if(nivel > 5) nivel = 1;
-        const n = ["", "1: RITMO", "2: SURVIVOR", "3: SNAKE", "4: FLAPPY", "5: CATCH"];
+        const n = ["", "1: RITMO", "2: SURVIVOR", "3: PAC-MAN", "4: FLAPPY", "5: CATCH"];
         document.getElementById('lvl-tag').innerText = "Nivel " + n[nivel];
-        alert("¡Nivel " + (nivel-1) + " superado!");
+        alert("¡Nivel superado!");
     }
 }
 
 function reiniciar() { 
     puntos = 0; items = []; frame = 0; 
-    jugador.x = canvas.width/2; jugador.y = canvas.height/2; jugador.d = 'parado';
+    jugador.x = 50; jugador.y = canvas.height/2; jugador.d = 'parado';
+    enemigo.x = canvas.width; enemigo.y = canvas.height;
     alert("¡D'oh!"); 
 }
 
 function loop() {
     ctx.clearRect(0,0,canvas.width, canvas.height); frame++;
-    if(nivel===1) motorRitmo(); else if(nivel===2) motorSurvivor(); else if(nivel===3) motorSnake();
+    if(nivel===1) motorRitmo(); else if(nivel===2) motorSurvivor(); else if(nivel===3) motorPacman();
     else if(nivel===4) motorFlappy(); else if(nivel===5) motorCatch();
     requestAnimationFrame(loop);
 }
