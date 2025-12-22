@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero: Laberinto y Flappy</title>
+    <title>Homero: Springfield Maze</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
@@ -25,24 +25,29 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let nivel = 1, puntos = 0, frame = 0, items = [];
-let jugador = { x: 100, y: 100, w: 30, h: 40, vy: 0, saltos: 0, d: 'parado' };
+let nivel = 1, puntos = 0, frame = 0, items = [], decoracion = [];
+let jugador = { x: 0, y: 0, w: 25, h: 25, vy: 0, saltos: 0, d: 'parado' };
 let enemigos = [];
 
-// --- LABERINTO NIVEL 3 ---
-const laberinto = [
-    [1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,1,0,0,0,0,1],
-    [1,0,1,0,1,0,1,1,0,1],
-    [1,0,1,0,0,0,0,1,0,1],
-    [1,0,1,1,1,1,0,1,0,1],
-    [1,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1]
+// --- MAPA PAC-MAN (1 = Pared, 0 = Camino con punto) ---
+const mapa = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,1,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,0,1,0,1,1,0,1],
+    [1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
-const celdaW = window.innerWidth / 10;
-const celdaH = window.innerHeight / 7;
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+let celdaW, celdaH;
+
+function resize() { 
+    canvas.width = window.innerWidth; 
+    canvas.height = window.innerHeight;
+    celdaW = canvas.width / 13;
+    celdaH = canvas.height / 7;
+}
 window.addEventListener('resize', resize); resize();
 
 // --- CONTROLES ---
@@ -50,7 +55,7 @@ let touchStartX = 0, touchStartY = 0;
 window.addEventListener('touchstart', (e) => {
     touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
     if (nivel === 1 && jugador.saltos < 2) { jugador.vy = -14; jugador.saltos++; }
-    if (nivel === 4) { jugador.vy = -9; } 
+    if (nivel === 4) { jugador.vy = -8; } 
 });
 
 window.addEventListener('touchmove', (e) => {
@@ -72,7 +77,7 @@ function motorRitmo() {
     if(frame % 130 === 0) items.push({x: canvas.width, y: canvas.height-95, t: 'c'});
     if(frame % 170 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
     items.forEach((it, i) => {
-        it.x -= 5; ctx.font = "35px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
+        it.x -= 5; ctx.font = "30px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
         if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) {
             it.t === 'c' ? reiniciar() : (items.splice(i, 1), sumarPunto());
         }
@@ -98,63 +103,67 @@ function motorSurvivor() {
     dibujarHomero();
 }
 
-function motorPacman() { // NIVEL 3: EL LABERINTO
+function motorPacman() { // NIVEL 3: PAC-MAN FIDELIDAD TOTAL
     ctx.fillStyle = "#000"; ctx.fillRect(0,0,canvas.width, canvas.height);
     
-    // Dibujar Paredes
-    ctx.fillStyle = "#00f";
-    laberinto.forEach((fila, r) => {
+    // Dibujar Laberinto y Puntitos
+    mapa.forEach((fila, r) => {
         fila.forEach((celda, c) => {
-            if(celda === 1) ctx.fillRect(c*celdaW, r*celdaH, celdaW, celdaH);
+            if(celda === 1) {
+                ctx.strokeStyle = "#2424ff"; ctx.lineWidth = 4;
+                ctx.strokeRect(c*celdaW + 5, r*celdaH + 5, celdaW - 10, celdaH - 10);
+            } else {
+                ctx.fillStyle = "#fff"; // Puntitos que no cuentan
+                ctx.beginPath(); ctx.arc(c*celdaW + celdaW/2, r*celdaH + celdaH/2, 2, 0, Math.PI*2); ctx.fill();
+            }
         });
     });
 
-    // Movimiento con colisión
+    // Movimiento con colisión de paredes
     let nx = jugador.x, ny = jugador.y;
     if(jugador.d === 'r') nx += 3; if(jugador.d === 'l') nx -= 3;
     if(jugador.d === 'u') ny -= 3; if(jugador.d === 'd') ny += 3;
 
-    let gridX = Math.floor((nx + 15) / celdaW), gridY = Math.floor((ny + 20) / celdaH);
-    if(laberinto[gridY] && laberinto[gridY][gridX] === 0) { jugador.x = nx; jugador.y = ny; }
+    let gX = Math.floor((nx + 12) / celdaW), gY = Math.floor((ny + 12) / celdaH);
+    if(mapa[gY] && mapa[gY][gX] === 0) { jugador.x = nx; jugador.y = ny; }
 
-    // Enemigo (Flanders / Marge)
-    enemigos.forEach(e => {
+    // Enemigos de Homero
+    const nombres = ["👴", "🤡", "👩", "👨‍🔧"]; // Burns, Bob, Patty/Selma, Frank Jr
+    enemigos.forEach((e, idx) => {
         let a = Math.atan2(jugador.y - e.y, jugador.x - e.x);
-        e.x += Math.cos(a) * 1.5; e.y += Math.sin(a) * 1.5;
-        ctx.fillText("😡", e.x, e.y);
+        e.x += Math.cos(a) * 1.2; e.y += Math.sin(a) * 1.2;
+        ctx.font = "25px Arial"; ctx.fillText(nombres[idx % 4], e.x, e.y);
         if(Math.hypot(jugador.x - e.x, jugador.y - e.y) < 30) reiniciar();
     });
 
-    if(frame % 100 === 0) items.push({x: 2*celdaW, y: 2*celdaH, t: 'd'}); // Spawner de donas
+    // Donas (Las únicas que cuentan)
     items.forEach((it, i) => {
         ctx.fillText("🍩", it.x, it.y);
-        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) { items.splice(i,1); sumarPunto(); }
+        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 35) { items.splice(i, 1); sumarPunto(); }
     });
     dibujarHomero();
 }
 
-function motorFlappy() { // NIVEL 4: DONAS SIEMPRE VISIBLES
+function motorFlappy() { // NIVEL 4: DONAS ANCLADAS
     ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,canvas.width, canvas.height);
     jugador.vy += 0.5; jugador.y += jugador.vy; jugador.x = 80;
 
-    if(frame % 80 === 0) {
-        let h = 100 + Math.random() * (canvas.height - 350);
-        items.push({x: canvas.width, y: h, t: 'p', galleta: true});
+    if(frame % 90 === 0) {
+        let h = 150 + Math.random() * (canvas.height - 400);
+        items.push({x: canvas.width, y: h, t: 'p', dona: true});
     }
 
     items.forEach((it, i) => {
-        it.x -= 5;
+        it.x -= 4;
         ctx.fillStyle = "#2ecc71"; 
-        ctx.fillRect(it.x, 0, 60, it.y);
-        ctx.fillRect(it.x, it.y + 220, 60, canvas.height);
+        ctx.fillRect(it.x, 0, 60, it.y); // Tubo arriba
+        ctx.fillRect(it.x, it.y + 200, 60, canvas.height); // Tubo abajo
         
-        if(it.galleta) {
-            ctx.fillText("🍩", it.x + 10, it.y + 110);
-            if(Math.hypot(jugador.x - (it.x+10), jugador.y - (it.y+110)) < 50) {
-                it.galleta = false; sumarPunto();
-            }
+        if(it.dona) {
+            ctx.font = "30px Arial"; ctx.fillText("🍩", it.x + 10, it.y + 120);
+            if(Math.hypot(jugador.x - (it.x+10), jugador.y - (it.y+120)) < 50) { it.dona = false; sumarPunto(); }
         }
-        if(jugador.x + 30 > it.x && jugador.x < it.x + 60 && (jugador.y < it.y || jugador.y + 40 > it.y + 220)) reiniciar();
+        if(jugador.x + 25 > it.x && jugador.x < it.x + 60 && (jugador.y < it.y || jugador.y + 35 > it.y + 200)) reiniciar();
     });
     if(jugador.y > canvas.height || jugador.y < 0) reiniciar();
     dibujarHomero();
@@ -162,11 +171,11 @@ function motorFlappy() { // NIVEL 4: DONAS SIEMPRE VISIBLES
 
 function motorCatch() { 
     ctx.fillStyle = "#34495e"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    jugador.y = canvas.height - 100;
+    jugador.y = canvas.height - 80;
     if(frame % 50 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: Math.random() > 0.2 ? 'b' : 'bomb'});
     items.forEach((it, i) => {
         it.y += 6; ctx.fillText(it.t === 'b' ? "🍺" : "💣", it.x, it.y);
-        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 55) {
+        if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 50) {
             it.t === 'bomb' ? reiniciar() : (items.splice(i, 1), sumarPunto());
         }
     });
@@ -178,20 +187,34 @@ function actualizarFisica(s) {
     jugador.vy += 0.8; jugador.y += jugador.vy;
     if(jugador.y > s) { jugador.y = s; jugador.vy = 0; jugador.saltos = 0; }
 }
-function dibujarHomero() { ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 30, 40); }
+function dibujarHomero() { ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 25, 35); }
+
 function sumarPunto() {
     puntos++; document.getElementById('puntos').innerText = puntos;
     if(puntos >= 10) { 
         nivel++; puntos = 0; items = []; frame = 0; 
-        jugador.x = celdaW + 10; jugador.y = celdaH + 10; jugador.d = 'parado';
-        enemigos = nivel === 3 ? [{x: 8*celdaW, y: 5*celdaH}] : [];
-        if(nivel > 5) nivel = 1;
+        prepararNivel();
         const n = ["", "1: RITMO", "2: SURVIVOR", "3: PAC-MAN", "4: FLAPPY", "5: CATCH"];
         document.getElementById('lvl-tag').innerText = "Nivel " + n[nivel];
         alert("¡Siguiente Nivel!");
     }
 }
-function reiniciar() { puntos = 0; items = []; frame = 0; alert("¡D'oh!"); nivel = nivel; }
+
+function prepararNivel() {
+    if(nivel === 3) {
+        jugador.x = celdaW + 10; jugador.y = celdaH + 10;
+        enemigos = [
+            {x: 11*celdaW, y: celdaH}, {x: 11*celdaW, y: 5*celdaH}, 
+            {x: celdaW, y: 5*celdaH}, {x: 6*celdaW, y: 3*celdaH}
+        ];
+        // Esparcir 10 donas en lugares vacíos del mapa
+        for(let i=0; i<10; i++) items.push({x: (1 + Math.random()*10)*celdaW, y: (1 + Math.random()*5)*celdaH, t:'d'});
+    } else {
+        jugador.x = 50; jugador.y = canvas.height/2;
+    }
+}
+
+function reiniciar() { puntos = 0; items = []; frame = 0; prepararNivel(); alert("¡D'oh!"); }
 
 function loop() {
     ctx.clearRect(0,0,canvas.width, canvas.height); frame++;
@@ -199,6 +222,7 @@ function loop() {
     else if(nivel===4) motorFlappy(); else if(nivel===5) motorCatch();
     requestAnimationFrame(loop);
 }
+prepararNivel();
 loop();
 </script>
 </body>
