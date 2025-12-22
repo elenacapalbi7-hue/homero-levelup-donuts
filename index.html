@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero: Springfield Quest Kids</title>
+    <title>Homero: Springfield Quest</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
@@ -15,7 +15,7 @@
 
 <div id="ui">
     <div class="hud">
-        <strong id="lvl-tag">Nivel 1: RITMO</strong><br>
+        <strong id="lvl-tag">Nivel 1</strong><br>
         Donas: <span id="puntos">0</span>/10
     </div>
 </div>
@@ -28,7 +28,7 @@ const ctx = canvas.getContext('2d');
 let nivel = 1, puntos = 0, frame = 0, items = [], pellets = [], enemigos = [];
 let jugador = { x: 50, y: 0, w: 40, h: 50, vy: 0, saltos: 0, d: 'parado', proximaD: '', targetX: 50, targetY: 50 };
 
-// --- MAPA NIVEL 3 ---
+// LABERINTO REAL NIVEL 3 (Estructura Pac-Man Clásica)
 const mapaReal = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
     [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
@@ -37,18 +37,37 @@ const mapaReal = [
     [1,0,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,0,1],
     [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
     [1,1,1,1,0,1,1,1,2,1,2,1,1,1,0,1,1,1,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1] // Simplificado para estabilidad
+    [1,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,1],
+    [1,1,1,1,0,1,2,1,1,2,1,1,2,1,0,1,1,1,1],
+    [1,0,0,0,0,2,2,1,2,2,2,1,2,2,0,0,0,0,1],
+    [1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
+    [1,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,1],
+    [1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
+    [1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1],
+    [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+    [1,0,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+];
+
+const donasPos = [
+    {r:1, c:1}, {r:1, c:17}, {r:3, c:9}, {r:5, c:4}, {r:5, c:14},
+    {r:13, c:1}, {r:13, c:17}, {r:15, c:7}, {r:19, c:1}, {r:19, c:17}
 ];
 
 let TW, TH;
 function resize() { 
     canvas.width = window.innerWidth; 
     canvas.height = window.innerHeight;
-    TW = canvas.width / 19; TH = (canvas.height * 0.8) / 19;
+    TW = canvas.width / 19; 
+    TH = (canvas.height * 0.85) / 21;
 }
 window.addEventListener('resize', resize); resize();
 
-// --- CONTROLES (SIN VELOCIDAD POR ARRASTRE) ---
+// CONTROLES - VELOCIDAD FIJA TOTAL
 let tX = 0, tY = 0;
 window.addEventListener('touchstart', e => {
     tX = e.touches[0].clientX; tY = e.touches[0].clientY;
@@ -57,18 +76,15 @@ window.addEventListener('touchstart', e => {
 
 window.addEventListener('touchmove', e => {
     e.preventDefault();
-    let curX = e.touches[0].clientX;
-    let curY = e.touches[0].clientY;
-    let dx = curX - tX, dy = curY - tY;
+    let dx = e.touches[0].clientX - tX;
+    let dy = e.touches[0].clientY - tY;
 
     if (nivel === 3) {
-        // Solo cambia la dirección, la velocidad es fija en el motor
         if (Math.abs(dx) > Math.abs(dy)) jugador.proximaD = dx > 0 ? 'r' : 'l';
         else jugador.proximaD = dy > 0 ? 'd' : 'u';
     } else {
-        // En nivel 2 y otros, el target sigue al dedo pero Homero se mueve a velocidad constante fija
-        jugador.targetX = curX - 20;
-        jugador.targetY = curY - 25;
+        jugador.targetX = e.touches[0].clientX;
+        jugador.targetY = e.touches[0].clientY;
     }
 }, {passive: false});
 
@@ -81,18 +97,17 @@ function puedeMover(x, y, w, h) {
     });
 }
 
-// --- MOTORES ---
-function motorRitmo() { // NIVEL 1
+function motorRitmo() {
     ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width, canvas.height);
     jugador.vy += 0.7; jugador.y += jugador.vy;
     if(jugador.y > canvas.height-110) { jugador.y = canvas.height-110; jugador.vy = 0; jugador.saltos = 0; }
     
-    let velCactus = 4.5; // MÁS LENTO (Antes 6)
-    if(frame % 140 === 0) items.push({x: canvas.width, y: canvas.height-95, t: 'c'});
-    if(frame % 180 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
+    let velObstaculos = 4; // LENTO PARA NIÑOS
+    if(frame % 150 === 0) items.push({x: canvas.width, y: canvas.height-95, t: 'c'});
+    if(frame % 200 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
     
     items.forEach((it, i) => {
-        it.x -= velCactus;
+        it.x -= velObstaculos; 
         ctx.font = "40px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
         if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) {
             it.t === 'c' ? reiniciar() : (items.splice(i, 1), sumarPunto());
@@ -101,20 +116,23 @@ function motorRitmo() { // NIVEL 1
     ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 50);
 }
 
-function motorSurvivor() { // NIVEL 2
+function motorSurvivor() {
     ctx.fillStyle = "#2d3436"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    // Velocidad de Homero fija a 6
     let dx = jugador.targetX - jugador.x, dy = jugador.targetY - jugador.y;
     let dist = Math.hypot(dx, dy);
-    if(dist > 5) { jugador.x += (dx/dist) * 6; jugador.y += (dy/dist) * 6; }
+    if(dist > 5) { 
+        // VELOCIDAD FIJA DE 5, NO IMPORTA EL ARRASTRE
+        jugador.x += (dx/dist) * 5; 
+        jugador.y += (dy/dist) * 5; 
+    }
 
-    if(frame % 110 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: 'z'});
+    if(frame % 120 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: 'z'});
     if(frame % 150 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t: 'd'});
     
     items.forEach((it, i) => {
         if(it.t === 'z') {
             let a = Math.atan2(jugador.y - it.y, jugador.x - it.x);
-            it.x += Math.cos(a)*1.4; it.y += Math.sin(a)*1.4; // ZOMBIES LENTOS
+            it.x += Math.cos(a)*1.2; it.y += Math.sin(a)*1.2; // ZOMBIES LENTOS
             ctx.font = "30px Arial"; ctx.fillText("🧟", it.x, it.y);
             if(Math.hypot(jugador.x - it.x, jugador.y - it.y) < 30) reiniciar();
         } else {
@@ -125,13 +143,17 @@ function motorSurvivor() { // NIVEL 2
     ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, 40, 50);
 }
 
-function motorPacman() { // NIVEL 3
+function motorPacman() {
     ctx.fillStyle = "#000"; ctx.fillRect(0,0,canvas.width, canvas.height);
     mapaReal.forEach((f, r) => f.forEach((c, col) => {
-        if(c === 1) { ctx.strokeStyle = "#2424ff"; ctx.strokeRect(col*TW+2, r*TH+2, TW-4, TH-4); }
+        if(c === 1) { ctx.strokeStyle = "#2424ff"; ctx.lineWidth=2; ctx.strokeRect(col*TW+2, r*TH+2, TW-4, TH-4); }
     }));
-    
-    let vH = 3; // Homero siempre a velocidad 3
+    pellets.forEach((p, i) => {
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 6.3); ctx.fill();
+        if(Math.hypot(jugador.x+jugador.w/2-p.x, jugador.y+jugador.h/2-p.y) < 15) pellets.splice(i, 1);
+    });
+
+    let vH = 2.8; // VELOCIDAD FIJA HOMERO
     if(jugador.proximaD === 'r' && puedeMover(jugador.x+vH, jugador.y, jugador.w, jugador.h)) jugador.d = 'r';
     if(jugador.proximaD === 'l' && puedeMover(jugador.x-vH, jugador.y, jugador.w, jugador.h)) jugador.d = 'l';
     if(jugador.proximaD === 'u' && puedeMover(jugador.x, jugador.y-vH, jugador.w, jugador.h)) jugador.d = 'u';
@@ -141,45 +163,68 @@ function motorPacman() { // NIVEL 3
     if(jugador.d === 'r') nx += vH; if(jugador.d === 'l') nx -= vH;
     if(jugador.d === 'u') ny -= vH; if(jugador.d === 'd') ny += vH;
     if(puedeMover(nx, ny, jugador.w, jugador.h)) { jugador.x = nx; jugador.y = ny; }
-    
+
     enemigos.forEach((e) => {
-        let vE = 1.5; // Enemigos lentos
+        let vE = 1.4; // ENEMIGOS LENTOS Y AUTÓNOMOS
         let ex = e.x, ey = e.y;
         if(e.dir === 'r') ex += vE; else if(e.dir === 'l') ex -= vE;
         else if(e.dir === 'u') ey -= vE; else if(e.dir === 'd') ey += vE;
         if(puedeMover(ex, ey, 25, 25)) { e.x = ex; e.y = ey; }
         else { e.dir = ['r', 'l', 'u', 'd'][Math.floor(Math.random()*4)]; }
         ctx.font = "24px Arial"; ctx.fillText("🧟", e.x, e.y + 20);
-        if(Math.hypot(jugador.x - e.x, jugador.y - e.y) < 20) reiniciar();
+        if(Math.hypot(jugador.x+jugador.w/2 - (e.x+12), jugador.y+jugador.h/2 - (e.y+12)) < 20) reiniciar();
+    });
+
+    items.forEach((it, i) => {
+        ctx.font = "24px Arial"; ctx.fillText("🍩", it.x - 12, it.y + 12);
+        if(Math.hypot(jugador.x+jugador.w/2 - it.x, jugador.y+jugador.h/2 - it.y) < 25) { items.splice(i,1); sumarPunto(); }
     });
     ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
 }
 
 function sumarPunto() {
     puntos++; document.getElementById('puntos').innerText = puntos;
-    if(puntos >= 10) { nivel++; puntos = 0; alert("¡Nivel superado!"); prepararNivel(); }
+    if(puntos >= 10) { 
+        nivel++; puntos = 0; 
+        document.getElementById('puntos').innerText = "0";
+        alert("¡Nivel superado!"); 
+        prepararNivel(); 
+    }
 }
 
 function prepararNivel() {
-    items = []; enemigos = []; frame = 0;
-    const titulos = ["", "1: RITMO", "2: SURVIVOR", "3: PAC-MAN", "4: PRÓXIMAMENTE", "5: FINAL"];
-    document.getElementById('lvl-tag').innerText = "Nivel " + titulos[nivel];
-    if(nivel > 3) { ctx.fillStyle = "white"; ctx.fillText("¡Gracias por jugar! Más niveles pronto.", 50, canvas.height/2); return; }
+    items = []; pellets = []; enemigos = []; frame = 0;
+    const titulos = ["", "Nivel 1: Desierto", "Nivel 2: Cementerio", "Nivel 3: Laberinto", "Nivel 4: Nubes", "Nivel 5: Planta Nuclear"];
+    document.getElementById('lvl-tag').innerText = titulos[nivel] || "¡Ganaste!";
     
     if(nivel === 1) jugador = { x: 50, y: canvas.height-110, w: 40, h: 50, vy: 0, saltos: 0, d: 'parado' };
     if(nivel === 2) jugador = { x: canvas.width/2, y: canvas.height/2, w: 40, h: 50, targetX: canvas.width/2, targetY: canvas.height/2 };
-    if(nivel === 3) { resize(); jugador = { x: TW+5, y: TH+5, w: TW*0.7, h: TW*0.7, d: 'parado', proximaD: '' };
-        enemigos = [{x: 5*TW, y: 5*TH, dir: 'r'}]; }
+    if(nivel === 3) { 
+        resize(); 
+        jugador = { x: TW+5, y: TH+5, w: TW*0.7, h: TW*0.7, d: 'parado', proximaD: '' };
+        enemigos = [{x: 9*TW, y: 9*TH, dir: 'u'}, {x: 1*TW, y: 17*TH, dir: 'r'}];
+        mapaReal.forEach((f, r) => f.forEach((c, col) => { if(c === 0) pellets.push({x: col*TW+TW/2, y: r*TH+TH/2}); }));
+        donasPos.forEach(p => items.push({x: p.c*TW+TW/2, y: p.r*TH+TH/2}));
+    }
+    // Nivel 4 y 5 usan motor survivor con diferente fondo para simplificar
+    if(nivel >= 4) jugador = { x: canvas.width/2, y: canvas.height/2, w: 40, h: 50, targetX: canvas.width/2, targetY: canvas.height/2 };
 }
 
-function reiniciar() { alert("¡D'oh!"); puntos = 0; prepararNivel(); }
+function reiniciar() { alert("¡D'oh!"); puntos = 0; document.getElementById('puntos').innerText = "0"; prepararNivel(); }
 
 function loop() {
     frame++;
     if(nivel === 1) motorRitmo();
     else if(nivel === 2) motorSurvivor();
     else if(nivel === 3) motorPacman();
-    else { ctx.fillStyle = "black"; ctx.fillRect(0,0,canvas.width, canvas.height); ctx.fillStyle="white"; ctx.fillText("¡Fin del Demo!", 100, 100); }
+    else if(nivel === 4 || nivel === 5) {
+        ctx.fillStyle = nivel === 4 ? "#87CEEB" : "#228B22"; 
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+        motorSurvivor(); // Reutilizamos motor con más velocidad
+    } else {
+        ctx.fillStyle = "black"; ctx.fillRect(0,0,canvas.width, canvas.height);
+        ctx.fillStyle="white"; ctx.font="30px Arial"; ctx.fillText("¡ERES EL REY DE LAS DONAS!", 20, canvas.height/2);
+    }
     requestAnimationFrame(loop);
 }
 prepararNivel(); loop();
