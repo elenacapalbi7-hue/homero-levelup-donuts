@@ -29,11 +29,10 @@
  */
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let nivel = 1; // FORZAMOS INICIO EN NIVEL 1
+let nivel = 1; 
 let puntos = 0, frame = 0, items = [], pellets = [], enemigos = [];
 let jugador = { x: 50, y: 0, w: 40, h: 50, vy: 0, saltos: 0, d: 'parado', proximaD: '' };
 
-// Mapa Pac-Man (1=Pared, 0=Camino con punto, 2=Espacio vacío)
 const mapaReal = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
     [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
@@ -72,7 +71,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// CONTROLES
+// CONTROLES - VELOCIDAD CONSTANTE
 let tX = 0, tY = 0;
 window.addEventListener('touchstart', e => {
     tX = e.touches[0].clientX; tY = e.touches[0].clientY;
@@ -81,16 +80,18 @@ window.addEventListener('touchstart', e => {
 window.addEventListener('touchmove', e => {
     e.preventDefault();
     let dx = e.touches[0].clientX - tX, dy = e.touches[0].clientY - tY;
+    
+    // Solo tomamos la dirección del primer toque/deslize, sin importar la fuerza o duración
     if (nivel === 3) {
         if (Math.abs(dx) > Math.abs(dy)) jugador.proximaD = dx > 0 ? 'r' : 'l';
         else jugador.proximaD = dy > 0 ? 'd' : 'u';
     } else if (nivel === 2) {
-        jugador.x = e.touches[0].clientX - 20;
-        jugador.y = e.touches[0].clientY - 25;
+        // En Survivor el movimiento es directo pero a velocidad controlada por código, no por el dedo
+        jugador.targetX = e.touches[0].clientX - 20;
+        jugador.targetY = e.touches[0].clientY - 25;
     }
 }, {passive: false});
 
-// LÓGICA DE COLISIÓN PARA PACMAN
 function puedeMover(x, y, w, h) {
     let margin = 5;
     let pts = [{x:x+margin, y:y+margin}, {x:x+w-margin, y:y+margin}, {x:x+margin, y:y+h-margin}, {x:x+w-margin, y:y+h-margin}];
@@ -101,17 +102,21 @@ function puedeMover(x, y, w, h) {
 }
 
 /**
- * MOTORES DE JUEGO
+ * MOTORES
  */
 
 function motorRitmo() {
     ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width, canvas.height);
     jugador.vy += 0.8; jugador.y += jugador.vy;
     if(jugador.y > canvas.height-110) { jugador.y = canvas.height-110; jugador.vy = 0; jugador.saltos = 0; }
+    
+    let velObstaculos = 6; // Velocidad fija
     if(frame % 120 === 0) items.push({x: canvas.width, y: canvas.height-95, t: 'c'});
     if(frame % 160 === 0) items.push({x: canvas.width, y: canvas.height-220, t: 'd'});
+    
     items.forEach((it, i) => {
-        it.x -= 6; ctx.font = "40px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
+        it.x -= velObstaculos; 
+        ctx.font = "40px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
         if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 45) {
             it.t === 'c' ? reiniciar() : (items.splice(i, 1), sumarPunto());
         }
@@ -121,8 +126,21 @@ function motorRitmo() {
 
 function motorSurvivor() {
     ctx.fillStyle = "#2d3436"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    
+    // Movimiento suave a velocidad constante hacia el objetivo
+    if(jugador.targetX !== undefined) {
+        let dx = jugador.targetX - jugador.x;
+        let dy = jugador.targetY - jugador.y;
+        let dist = Math.hypot(dx, dy);
+        if(dist > 5) {
+            jugador.x += (dx/dist) * 5; // Velocidad máxima fija
+            jugador.y += (dy/dist) * 5;
+        }
+    }
+
     if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: -50, t: 'z'});
     if(frame % 140 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t: 'd'});
+    
     items.forEach((it, i) => {
         if(it.t === 'z') {
             let a = Math.atan2(jugador.y - it.y, jugador.x - it.x);
@@ -142,30 +160,44 @@ function motorPacman() {
     mapaReal.forEach((f, r) => { f.forEach((c, col) => {
         if(c === 1) { ctx.strokeStyle = "#2424ff"; ctx.lineWidth=2; ctx.strokeRect(col*TW+2, r*TH+2, TW-4, TH-4); }
     });});
+    
     pellets.forEach((p, i) => {
         ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 6.3); ctx.fill();
         if(Math.hypot(jugador.x+jugador.w/2-p.x, jugador.y+jugador.h/2-p.y) < 15) pellets.splice(i, 1);
     });
-    let v = 3;
-    if(jugador.proximaD === 'r' && puedeMover(jugador.x+v, jugador.y, jugador.w, jugador.h)) jugador.d = 'r';
-    if(jugador.proximaD === 'l' && puedeMover(jugador.x-v, jugador.y, jugador.w, jugador.h)) jugador.d = 'l';
-    if(jugador.proximaD === 'u' && puedeMover(jugador.x, jugador.y-v, jugador.w, jugador.h)) jugador.d = 'u';
-    if(jugador.proximaD === 'd' && puedeMover(jugador.x, jugador.y+v, jugador.w, jugador.h)) jugador.d = 'd';
+
+    let vH = 3; // Velocidad fija Homero
+    if(jugador.proximaD === 'r' && puedeMover(jugador.x+vH, jugador.y, jugador.w, jugador.h)) jugador.d = 'r';
+    if(jugador.proximaD === 'l' && puedeMover(jugador.x-vH, jugador.y, jugador.w, jugador.h)) jugador.d = 'l';
+    if(jugador.proximaD === 'u' && puedeMover(jugador.x, jugador.y-vH, jugador.w, jugador.h)) jugador.d = 'u';
+    if(jugador.proximaD === 'd' && puedeMover(jugador.x, jugador.y+vH, jugador.w, jugador.h)) jugador.d = 'd';
+    
     let nx = jugador.x, ny = jugador.y;
-    if(jugador.d === 'r') nx += v; if(jugador.d === 'l') nx -= v;
-    if(jugador.d === 'u') ny -= v; if(jugador.d === 'd') ny += v;
+    if(jugador.d === 'r') nx += vH; if(jugador.d === 'l') nx -= vH;
+    if(jugador.d === 'u') ny -= vH; if(jugador.d === 'd') ny += vH;
     if(puedeMover(nx, ny, jugador.w, jugador.h)) { jugador.x = nx; jugador.y = ny; }
     
     const icons = ["👴", "🤡", "👩", "👨‍🔧"];
     enemigos.forEach((e, i) => {
-        let dx = jugador.x - e.x, dy = jugador.y - e.y;
+        let vE = 2.2; // Velocidad fija enemigos
+        
+        // Movimiento autónomo: si no pueden seguir en su dirección, eligen una nueva aleatoria
         let ex = e.x, ey = e.y;
-        if(Math.abs(dx) > Math.abs(dy)) ex += (dx > 0 ? 1 : -1) * 1.8;
-        else ey += (dy > 0 ? 1 : -1) * 1.8;
-        if(puedeMover(ex, ey, 25, 25)) { e.x = ex; e.y = ey; }
+        if(e.dir === 'r') ex += vE; else if(e.dir === 'l') ex -= vE;
+        else if(e.dir === 'u') ey -= vE; else if(e.dir === 'd') ey += vE;
+
+        if(puedeMover(ex, ey, 25, 25)) {
+            e.x = ex; e.y = ey;
+        } else {
+            // Chocó contra pared, elige nueva dirección aleatoria
+            const dirs = ['r', 'l', 'u', 'd'];
+            e.dir = dirs[Math.floor(Math.random() * dirs.length)];
+        }
+
         ctx.font = "24px Arial"; ctx.fillText(icons[i%4], e.x, e.y + 20);
         if(Math.hypot(jugador.x+jugador.w/2 - (e.x+12), jugador.y+jugador.h/2 - (e.y+12)) < 20) reiniciar();
     });
+
     items.forEach((it, i) => {
         ctx.font = "24px Arial"; ctx.fillText("🍩", it.x - 12, it.y + 12);
         if(Math.hypot(jugador.x+jugador.w/2 - it.x, jugador.y+jugador.h/2 - it.y) < 25) { items.splice(i,1); sumarPunto(); }
@@ -173,16 +205,11 @@ function motorPacman() {
     ctx.fillStyle = "yellow"; ctx.fillRect(jugador.x, jugador.y, jugador.w, jugador.h);
 }
 
-/**
- * SISTEMA CENTRAL
- */
-
 function sumarPunto() {
     puntos++;
     document.getElementById('puntos').innerText = puntos;
     if(puntos >= 10) {
-        nivel++;
-        puntos = 0;
+        nivel++; puntos = 0;
         document.getElementById('puntos').innerText = puntos;
         alert("¡Nivel completado!");
         prepararNivel();
@@ -197,11 +224,15 @@ function prepararNivel() {
     if(nivel === 1) {
         jugador = { x: 50, y: canvas.height-110, w: 40, h: 50, vy: 0, saltos: 0, d: 'parado' };
     } else if(nivel === 2) {
-        jugador = { x: canvas.width/2, y: canvas.height/2, w: 40, h: 50, d: 'parado' };
+        jugador = { x: canvas.width/2, y: canvas.height/2, w: 40, h: 50, d: 'parado', targetX: canvas.width/2, targetY: canvas.height/2 };
     } else if(nivel === 3) {
         resize();
         jugador = { x: TW+5, y: TH+5, w: TW*0.7, h: TW*0.7, d: 'parado', proximaD: '' };
-        enemigos = [{x: 9*TW, y: 9*TH}, {x: 1*TW, y: 17*TH}, {x: 17*TW, y: 17*TH}, {x: 17*TW, y: 1*TH}];
+        // Inicializamos enemigos con una dirección inicial
+        enemigos = [
+            {x: 9*TW, y: 9*TH, dir: 'u'}, {x: 1*TW, y: 17*TH, dir: 'r'}, 
+            {x: 17*TW, y: 17*TH, dir: 'l'}, {x: 17*TW, y: 1*TH, dir: 'd'}
+        ];
         mapaReal.forEach((f, r) => { f.forEach((c, col) => { if(c === 0) pellets.push({x: col*TW+TW/2, y: r*TH+TH/2}); });});
         donasPos.forEach(p => items.push({x: p.c*TW+TW/2, y: p.r*TH+TH/2}));
     }
@@ -209,8 +240,7 @@ function prepararNivel() {
 
 function reiniciar() {
     alert("¡D'oh! Reintentando...");
-    puntos = 0;
-    document.getElementById('puntos').innerText = puntos;
+    puntos = 0; document.getElementById('puntos').innerText = puntos;
     prepararNivel();
 }
 
@@ -222,7 +252,6 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// ARRANCAR SIEMPRE EN NIVEL 1
 prepararNivel();
 loop();
 </script>
