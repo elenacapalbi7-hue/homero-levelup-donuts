@@ -8,14 +8,12 @@
         body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #87CEEB; overflow: hidden; }
         
-        /* UI SUPERIOR */
         #ui {
             position: absolute; top: 20px; width: 100%;
             display: flex; justify-content: space-around;
-            color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 20px;
+            color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 18px;
         }
 
-        /* PANTALLA MENSAJES */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
@@ -28,17 +26,17 @@
             box-shadow: 0 6px #2e7d32;
         }
 
-        /* CONTROLES ELEVADOS (BOTÓN DE SALTO ÚNICO) */
+        /* CONTROL DE SALTO ELEVADO */
         #controls {
-            position: absolute; bottom: 120px; width: 100%;
+            position: absolute; bottom: 130px; width: 100%;
             display: flex; justify-content: center; z-index: 20;
         }
 
         .jump-btn {
-            width: 120px; height: 120px; background: rgba(255, 255, 255, 0.4);
-            border: 5px solid white; border-radius: 50%;
+            width: 100px; height: 100px; background: rgba(255, 255, 255, 0.3);
+            border: 4px solid white; border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
-            font-size: 50px; color: white; user-select: none;
+            font-size: 45px; color: white; user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -49,14 +47,15 @@
 
 <div id="game-container">
     <div id="ui">
-        <div>⏰ <span id="clocks">0</span> / 10</div>
+        <div>⏰ <span id="clocks">0</span>/10</div>
+        <div>🍩 <span id="donuts">0</span></div>
         <div>❤️ <span id="lives">3</span></div>
     </div>
 
     <div id="overlay">
         <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Llega a la Planta!<br>Salta los obstáculos.<br>Atrapa 10 relojes.</p>
-        <button class="btn-action" id="mainBtn">¡CORRER!</button>
+        <p id="msg">¡Usa el DOBLE SALTO!<br>Atrapa 10 relojes.<br>¡Cuidado con el tráfico!</p>
+        <button class="btn-action" id="mainBtn">¡A CORRER!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -70,24 +69,34 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const clocksEl = document.getElementById('clocks');
+    const donutsEl = document.getElementById('donuts');
     const livesEl = document.getElementById('lives');
     const overlay = document.getElementById('overlay');
     const mainBtn = document.getElementById('mainBtn');
 
     let isPlaying = false;
-    let score = 0;
+    let scoreClocks = 0;
+    let scoreDonuts = 0;
     let lives = 3;
     let frameCount = 0;
-    let obstacles = [];
-    let gameSpeed = 4; // Velocidad moderada para niños
+    let items = [];
+    let gameSpeed = 5;
 
     const player = {
         x: 50, y: 0, w: 70, h: 90,
-        vy: 0, gravity: 0.8, jumpPower: -16,
-        grounded: false, emoji: "🏃‍♂️"
+        vy: 0, gravity: 0.7, jumpPower: -14,
+        jumps: 0, maxJumps: 2, // DOBLE SALTO
+        emoji: "🏃‍♂️"
     };
 
-    const hazardEmojis = ['🗑️', '🚨', '📦', '🚧']; // Bote, cono, caja, valla
+    const obstacles = [
+        {e: '🗑️', type: 'bad'}, 
+        {e: '🚧', type: 'bad'}, 
+        {e: '🚗', type: 'bad'}, // Auto de Juan Topo
+        {e: '📦', type: 'bad'},
+        {e: '⏰', type: 'clock'},
+        {e: '🍩', type: 'donut'}
+    ];
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -97,27 +106,27 @@
     window.addEventListener('resize', resize);
     resize();
 
-    function spawnObstacle() {
+    function spawn() {
         const rand = Math.random();
-        let type, emoji;
+        let obj;
         
-        if (rand < 0.3) { // 30% Relojes
-            type = 'good'; emoji = '⏰';
-        } else { // 70% Obstáculos
-            type = 'bad'; emoji = hazardEmojis[Math.floor(Math.random() * hazardEmojis.length)];
-        }
+        if (rand < 0.2) obj = obstacles[4]; // Reloj
+        else if (rand < 0.4) obj = obstacles[5]; // Dona
+        else obj = obstacles[Math.floor(Math.random() * 4)]; // Obstáculos malos
 
-        obstacles.push({
-            x: canvas.width + 50,
-            y: type === 'good' ? canvas.height - 150 - Math.random() * 100 : canvas.height - 80,
-            size: 50, type, emoji
+        items.push({
+            x: canvas.width + 100,
+            y: (obj.type !== 'bad' || Math.random() > 0.5) ? canvas.height - 180 - Math.random() * 80 : canvas.height - 90,
+            size: 55, 
+            type: obj.type, 
+            emoji: obj.e
         });
     }
 
     function update() {
         if (!isPlaying) return;
 
-        // Física de salto
+        // Física
         player.vy += player.gravity;
         player.y += player.vy;
 
@@ -125,34 +134,35 @@
         if (player.y > groundY) {
             player.y = groundY;
             player.vy = 0;
-            player.grounded = true;
+            player.jumps = 0; // Reinicia saltos al tocar suelo
         }
 
-        // Generar obstáculos
-        if (frameCount % 100 === 0) spawnObstacle();
+        if (frameCount % 90 === 0) spawn();
 
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-            let ob = obstacles[i];
-            ob.x -= gameSpeed;
+        for (let i = items.length - 1; i >= 0; i--) {
+            let it = items[i];
+            it.x -= gameSpeed;
 
-            // Colisión
-            if (player.x < ob.x + ob.size - 10 && player.x + player.w - 10 > ob.x &&
-                player.y < ob.y + ob.size - 10 && player.y + player.h > ob.y) {
+            // Colisión precisa
+            if (player.x < it.x + it.size - 15 && player.x + player.w - 15 > it.x &&
+                player.y < it.y + it.size - 15 && player.y + player.h > it.y) {
                 
-                if (ob.type === 'good') {
-                    score++;
-                    clocksEl.innerText = score;
-                    if (score >= 10) win();
+                if (it.type === 'clock') {
+                    scoreClocks++;
+                    clocksEl.innerText = scoreClocks;
+                    if (scoreClocks >= 10) win();
+                } else if (it.type === 'donut') {
+                    scoreDonuts++;
+                    donutsEl.innerText = scoreDonuts;
                 } else {
                     lives--;
                     livesEl.innerText = lives;
                     if (lives <= 0) die();
                 }
-                obstacles.splice(i, 1);
+                items.splice(i, 1);
                 continue;
             }
-
-            if (ob.x < -100) obstacles.splice(i, 1);
+            if (it.x < -100) items.splice(i, 1);
         }
         frameCount++;
     }
@@ -160,43 +170,49 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Suelo (Calle)
-        ctx.fillStyle = "#666";
+        // Calle con movimiento
+        ctx.fillStyle = "#555";
         ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-        ctx.fillStyle = "yellow";
-        for(let i=0; i<10; i++) ctx.fillRect((i*100) - (frameCount*gameSpeed % 100), canvas.height-25, 40, 5);
+        ctx.fillStyle = "#FFF";
+        for(let i=0; i<15; i++) {
+            ctx.fillRect((i*80) - (frameCount*gameSpeed % 80), canvas.height-22, 30, 4);
+        }
 
-        // Personaje
+        // Homero
         ctx.font = player.h + "px Arial";
         ctx.fillText(player.emoji, player.x, player.y + player.h);
 
-        // Obstáculos
-        obstacles.forEach(ob => {
-            ctx.font = ob.size + "px Arial";
-            ctx.fillText(ob.emoji, ob.x, ob.y + ob.size);
+        // Elementos
+        items.forEach(it => {
+            ctx.font = it.size + "px Arial";
+            ctx.fillText(it.emoji, it.x, it.y + it.size);
         });
 
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function startGame() {
-        score = 0; lives = 3; obstacles = []; frameCount = 0;
-        clocksEl.innerText = score; livesEl.innerText = lives;
+        scoreClocks = 0; scoreDonuts = 0; lives = 3; items = []; frameCount = 0;
+        clocksEl.innerText = "0"; donutsEl.innerText = "0"; livesEl.innerText = "3";
         overlay.style.display = "none";
         isPlaying = true;
         draw();
     }
 
     function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
-    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡EXCELENTE!"; document.getElementById('msg').innerText = "Llegaste a la planta a tiempo."; }
+    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡EXCELENTE!"; }
 
     mainBtn.onclick = startGame;
 
-    // Control de salto
-    const jumpAction = () => { if (player.grounded && isPlaying) { player.vy = player.jumpPower; player.grounded = false; } };
+    const jumpAction = () => {
+        if (isPlaying && player.jumps < player.maxJumps) {
+            player.vy = player.jumpPower;
+            player.jumps++;
+        }
+    };
+
     document.getElementById('btnJump').ontouchstart = (e) => { e.preventDefault(); jumpAction(); };
-    document.onmousedown = (e) => { if(e.target.id !== 'mainBtn') jumpAction(); };
-    window.onkeydown = (e) => { if(e.code === 'Space' || e.key === 'ArrowUp') jumpAction(); };
+    window.onkeydown = (e) => { if(e.key === ' ' || e.key === 'ArrowUp') jumpAction(); };
 </script>
 </body>
 </html>
