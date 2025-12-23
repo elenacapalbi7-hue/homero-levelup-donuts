@@ -3,28 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer's Springfield Quest</title>
+    <title>Homer Adventure 1-1</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Arial Black', sans-serif; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; transition: background 0.5s; }
-        canvas { display: block; width: 100%; height: 100%; }
-        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; font-size: 1.2rem; pointer-events: none; }
-        #controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; }
-        .btn { width: 70px; height: 70px; background: rgba(0,0,0,0.5); border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; user-select: none; }
-        #screen-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: yellow; text-align: center; text-shadow: 3px 3px #000; display: none; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 80%; z-index: 100; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; margin: auto; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; font-weight: bold; pointer-events: none; z-index: 10; }
+        #controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; z-index: 20; }
+        .btn { width: 65px; height: 65px; background: rgba(255,255,255,0.3); border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; user-select: none; -webkit-tap-highlight-color: transparent; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: yellow; text-align: center; text-shadow: 3px 3px #000; display: none; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; z-index: 100; width: 70%; }
     </style>
 </head>
 <body>
 
 <div id="game-container">
     <div id="ui">
-        <div>NIVEL: <span id="world-txt">1-1</span></div>
-        <div>🍩: <span id="donas">0</span></div>
-        <div>❤️: <span id="vidas">3</span></div>
+        <div>WORLD 1-1</div>
+        <div>🍩 <span id="donas">0</span></div>
+        <div>❤️ <span id="vidas">3</span></div>
     </div>
-    
-    <div id="screen-msg"></div>
-
+    <div id="msg"></div>
     <div id="controls">
         <div style="display:flex; gap:15px;">
             <div class="btn" id="left">⬅️</div>
@@ -36,140 +34,113 @@
 </div>
 
 <script>
-/** MOTOR DE JUEGO SIMPSON ADAPTADO DE MARIO BROS **/
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const msg = document.getElementById('screen-msg');
+const msg = document.getElementById('msg');
 
-let world = 1, level = 1, donas = 0, vidas = 3, camX = 0, active = true;
-let blocks = [], enemies = [], items = [], coins = [], fx = [];
+// Configuración de escala para que entre en cualquier pantalla
+const GRID = 40; 
+const V_WIDTH = 800; // Ancho virtual de referencia
+let scale = 1;
+
+let score = 0, lives = 3, camX = 0, active = true;
+let blocks = [], enemies = [], items = [], particles = [];
 let keys = { left: false, right: false };
 
 const p = { 
-    x: 100, y: 0, w: 40, h: 70, vx: 0, vy: 0, 
-    isSuper: false, hasFire: false, star: 0, 
-    ground: false, jumps: 0 
+    x: 80, y: 0, w: 32, h: 56, vx: 0, vy: 0, 
+    isSuper: false, star: 0, ground: false, jumps: 0 
 };
 
-function initLevel() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    blocks = []; enemies = []; items = []; coins = []; fx = [];
-    p.x = 100; p.y = canvas.height - 200; p.vx = 0; p.vy = 0;
-    camX = 0; active = true;
-    msg.style.display = 'none';
-    
-    document.getElementById('world-txt').innerText = `${world}-${level}`;
-
-    if(world === 1 && level === 1) build1_1();
-    if(world === 1 && level === 2) build1_2();
-    if(world === 1 && level === 3) build1_3();
-    if(world === 1 && level === 4) build1_4();
-    
+function init() {
+    resize();
+    buildLevel1_1();
     loop();
 }
 
-// --- CONSTRUCCIÓN DE NIVELES SEGÚN TU SOLICITUD ---
-
-function build1_1() {
-    document.getElementById('game-container').style.background = "#5c94fc"; // Día
-    const gY = canvas.height - 80;
-    // Suelo
-    for(let i=0; i<200; i++) if(!(i>120 && i<125)) blocks.push({x: i*40, y: gY, t: 'G'});
-    
-    // 1. Primer Flanders
-    enemies.push({x: 600, y: gY-40, vx: -2, t:'F'});
-
-    // 2. Primeros bloques (formación triangular)
-    // 3 abajo ladrillo
-    addBlock(800, gY-120, 'B'); addBlock(840, gY-120, 'B'); addBlock(880, gY-120, 'B');
-    // 3 arriba ?
-    addBlock(800, gY-240, '?', 'beer'); // Super Hongo (Duff)
-    addBlock(840, gY-240, '?', 'dona'); addBlock(880, gY-240, '?', 'dona');
-
-    // 3. Tuberías (4 en fila)
-    addPipe(1200, gY, 2); addPipe(1500, gY, 3); addPipe(1800, gY, 4); addPipe(2100, gY, 4, true); // 4ta secreta
-
-    // 4. Estrella y Koopa (Sr Burns)
-    addBlock(3000, gY-120, 'B'); addBlock(3040, gY-120, 'B', 'star'); // Estrella
-    enemies.push({x: 3200, y: gY-40, vx: -2, t:'K'}); // Koopa (Burns)
-
-    // Final
-    addFlag(7000, gY);
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    scale = canvas.height / 480; // Escalamos basándonos en la altura para que el suelo siempre esté visible
 }
 
-function build1_2() {
-    document.getElementById('game-container').style.background = "#202020"; // Subterráneo
-    const gY = canvas.height - 80;
-    for(let i=0; i<200; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+function buildLevel1_1() {
+    blocks = []; enemies = []; items = [];
+    const gY = 400; // Altura del suelo en coordenadas virtuales
+    p.y = gY - p.h;
 
-    // 1. Inicio: 5 bloques ?
-    for(let i=0; i<5; i++) addBlock(400 + (i*40), gY-160, '?', i===0?'beer':'dona');
-    enemies.push({x: 600, y: gY-40, vx: -2, t:'F'});
+    // 1. INICIO Y CAMINO (Pasos 1 y 2)
+    for(let i=0; i<40; i++) blocks.push({x: i*GRID, y: gY, t: 'G'});
+    enemies.push({x: 600, y: gY-GRID, vx: -1.5, t:'F'}); // Primer Flanders
 
-    // 5. Tuberías con Plantas
-    addPipe(2000, gY, 3, false, true); 
+    // 6 bloques formación (3 abajo ladrillo, 3 arriba ?)
+    addBlock(800, gY-120, 'B'); 
+    addBlock(840, gY-120, 'B'); 
+    addBlock(880, gY-120, 'B');
+    addBlock(800, gY-240, '?', 'beer'); // El de la izquierda tiene la Duff
+    addBlock(840, gY-240, '?', 'dona');
+    addBlock(880, gY-240, '?', 'dona');
 
-    addFlag(7000, gY);
+    // 2. TUBERÍAS (Paso 3)
+    addPipe(1200, gY, 2);
+    addPipe(1500, gY, 3);
+    addPipe(1800, gY, 4);
+    addPipe(2200, gY, 4); // Tubería secreta (simulada)
+
+    // 3. HOYO Y BLOQUES (Paso 5)
+    // Suelo después de tuberías
+    for(let i=60; i<80; i++) blocks.push({x: i*GRID, y: gY, t: 'G'});
+    // El hoyo está entre i=80 y i=85
+    for(let i=85; i<150; i++) blocks.push({x: i*GRID, y: gY, t: 'G'});
+
+    addBlock(3600, gY-120, '?', 'beer'); // Bloque con hongo después del hoyo
+    addBlock(3800, gY-120, 'B', 'multi'); // Bloque de 10 monedas
+
+    // 4. ESTRELLA Y KOOPA (Paso 6)
+    addBlock(4200, gY-120, 'B');
+    addBlock(4240, gY-120, 'B', 'star'); // Bloque con estrella
+    enemies.push({x: 4500, y: gY-GRID, vx: -2, t:'K'}); // Sr Burns (Koopa)
+
+    // 5. ESCALERAS Y FINAL (Paso 7 y 8)
+    for(let i=0; i<4; i++) {
+        for(let j=0; j<=i; j++) addBlock(5500 + (i*GRID), gY - GRID - (j*GRID), 'S');
+    }
+    // Mástil
+    blocks.push({x: 6000, y: gY-320, t: 'FLAG', w: 10, h: 320});
 }
 
-function build1_3() {
-    document.getElementById('game-container').style.background = "#a0d8f8"; // Cumbres
-    const gY = canvas.height - 80;
-    // Nivel de plataformas
-    for(let i=0; i<10; i++) blocks.push({x: i*40, y: gY, t: 'G'});
-    blocks.push({x: 600, y: gY-120, t: 'B', w: 200}); // Plataformas tipo árbol
-    blocks.push({x: 1000, y: gY-200, t: 'B', w: 200});
-    
-    addFlag(5000, gY);
+function addBlock(x, y, t, item=null) { blocks.push({x, y, t, item, hits: item==='multi'?10:1}); }
+function addPipe(x, y, h) {
+    for(let i=1; i<=h; i++) blocks.push({x, y: y-(i*GRID), t: 'P'});
 }
-
-function build1_4() {
-    document.getElementById('game-container').style.background = "#400000"; // Castillo Planta Nuclear
-    const gY = canvas.height - 80;
-    for(let i=0; i<200; i++) blocks.push({x: i*40, y: gY, t: 'G'});
-
-    // Jefe final
-    enemies.push({x: 4000, y: gY-120, vx: 0, t:'BOS'}); // Burns Gigante
-    blocks.push({x: 4200, y: gY-40, t: 'AXE'}); // Hacha
-}
-
-// --- FUNCIONES AUXILIARES ---
-
-function addBlock(x, y, t, item=null, hits=1) { blocks.push({x, y, t, item, hits}); }
-function addPipe(x, y, h, secret=false, plant=false) {
-    for(let i=1; i<=h; i++) blocks.push({x, y: y-(i*40), t: 'P'});
-}
-function addFlag(x, y) { blocks.push({x, y: y-300, t: 'F_POLE'}); }
 
 function update() {
     if(!active) return;
 
-    // Física Homero
-    if (keys.left) p.vx = -6;
-    else if (keys.right) p.vx = 6;
-    else p.vx *= 0.85;
+    if (keys.left) p.vx = -5;
+    else if (keys.right) p.vx = 5;
+    else p.vx *= 0.8;
 
     p.vy += 0.8;
     p.x += p.vx;
     p.y += p.vy;
-    camX = p.x - 100;
-
-    if(p.star > 0) p.star--;
+    
+    // Cámara suave
+    let targetCam = p.x - 100;
+    camX += (targetCam - camX) * 0.1;
+    if(camX < 0) camX = 0;
 
     p.ground = false;
     blocks.forEach((b, idx) => {
-        let bw = b.w || 40;
-        let bh = b.h || 40;
+        let bw = b.w || GRID;
+        let bh = b.h || GRID;
         if (p.x + p.w > b.x && p.x < b.x + bw && p.y + p.h > b.y && p.y < b.y + bh) {
-            if(b.t === 'F_POLE') { win(); return; }
-            if(b.t === 'AXE') { win(); return; }
-
+            if(b.t === 'FLAG') { win(); return; }
             if (p.vy > 0 && p.y + p.h - p.vy <= b.y) {
                 p.y = b.y - p.h; p.vy = 0; p.ground = true; p.jumps = 0;
             } else if (p.vy < 0 && p.y - p.vy >= b.y + bh) {
                 p.y = b.y + bh; p.vy = 2;
-                hitBlock(b, idx);
+                handleHit(b, idx);
             } else {
                 if(p.vx > 0) p.x = b.x - p.w;
                 if(p.vx < 0) p.x = b.x + bw;
@@ -177,116 +148,88 @@ function update() {
         }
     });
 
-    // Enemigos
     enemies.forEach((en, idx) => {
         en.x += en.vx;
-        if(Math.abs(p.x - en.x) < 40 && Math.abs(p.y - en.y) < 50) {
-            if(p.vy > 0 || p.star > 0) { 
-                enemies.splice(idx, 1); 
-                if(p.vy > 0) p.vy = -12; 
-            } else if(!p.isSuper) {
-                die();
-            } else {
-                p.isSuper = false; p.h = 70; // Encoger
-            }
+        if(Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 40) {
+            if(p.vy > 0) { enemies.splice(idx,1); p.vy = -10; }
+            else die();
         }
     });
 
-    // Items
     items.forEach((it, idx) => {
         it.y += 2;
-        if(Math.hypot(p.x-it.x, p.y-it.y) < 50) {
-            if(it.t === 'beer') { p.isSuper = true; p.h = 100; }
-            if(it.t === 'star') { p.star = 600; }
+        if(Math.hypot(p.x-it.x, p.y-it.y) < 40) {
+            if(it.t==='beer') { p.isSuper = true; p.h = 80; }
             items.splice(idx, 1);
         }
     });
 
-    if(p.y > canvas.height) die();
+    if(p.y > 600) die();
 }
 
-function hitBlock(b, idx) {
+function handleHit(b, idx) {
     if(b.t === '?' || b.t === 'B') {
-        if(b.item === 'beer') items.push({x: b.x, y: b.y-40, t:'beer'});
-        if(b.item === 'star') items.push({x: b.x, y: b.y-40, t:'star'});
-        if(b.item === 'dona') { donas++; fx.push({x: b.x, y: b.y-40, l:20}); }
-        if(b.t === '?') b.t = 'U';
-        else if(p.isSuper && b.t === 'B' && !b.item) blocks.splice(idx, 1);
+        if(b.item === 'beer') items.push({x: b.x, y: b.y-GRID, t:'beer'});
+        if(b.item === 'dona' || b.item === 'multi') { score++; document.getElementById('donas').innerText = score; }
+        if(b.hits > 1) b.hits--; else b.t = 'U';
     }
 }
 
 function die() {
-    vidas--;
-    if(vidas <= 0) {
-        msg.innerHTML = "¡D'OH!<br>GAME OVER";
-        msg.style.display = 'block';
-        active = false;
-        setTimeout(() => { world=1; level=1; vidas=3; donas=0; initLevel(); }, 3000);
-    } else {
-        initLevel();
-    }
+    active = false; lives--; 
+    document.getElementById('vidas').innerText = lives;
+    if(lives <= 0) { msg.innerHTML = "GAME OVER"; msg.style.display="block"; setTimeout(()=>location.reload(), 2000); }
+    else { p.x = camX + 20; p.y = 0; active = true; }
 }
 
 function win() {
     active = false;
-    msg.innerHTML = "¡EXCELENTE!<br>Nivel Completado";
-    msg.style.display = 'block';
-    setTimeout(() => {
-        level++;
-        if(level > 4) { world++; level=1; }
-        initLevel();
-    }, 3000);
+    msg.innerHTML = "¡EXCELENTE!<br>Nivel 1-1 Completado";
+    msg.style.display = "block";
 }
 
 function draw() {
     ctx.clearRect(0,0, canvas.width, canvas.height);
     ctx.save();
+    ctx.scale(scale, scale);
     ctx.translate(-camX, 0);
 
+    // Dibujar bloques
     blocks.forEach(b => {
-        if(b.t === 'G') ctx.fillStyle = '#944828';
-        else if(b.t === 'P') ctx.fillStyle = '#27ae60';
-        else if(b.t === 'B') ctx.fillStyle = '#e76e33';
-        else if(b.t === '?') ctx.fillStyle = '#f1c40f';
-        else if(b.t === 'U') ctx.fillStyle = '#7f8c8d';
-        else if(b.t === 'F_POLE') ctx.fillStyle = '#fff';
-        else ctx.fillStyle = 'red';
+        if(b.t==='G') ctx.fillStyle = '#944828';
+        else if(b.t==='B') ctx.fillStyle = '#e76e33';
+        else if(b.t==='?') ctx.fillStyle = '#f1c40f';
+        else if(b.t==='P') ctx.fillStyle = '#27ae60';
+        else if(b.t==='S') ctx.fillStyle = '#bdc3c7';
+        else if(b.t==='U') ctx.fillStyle = '#7f8c8d';
+        else ctx.fillStyle = 'white';
         
-        ctx.fillRect(b.x, b.y, b.w||40, b.h||40);
-        ctx.strokeStyle = 'black'; ctx.strokeRect(b.x, b.y, b.w||40, b.h||40);
-        if(b.t === '?') { ctx.fillStyle='white'; ctx.fillText("?", b.x+15, b.y+25); }
+        ctx.fillRect(b.x, b.y, b.w||GRID, b.h||GRID);
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 1;
+        ctx.strokeRect(b.x, b.y, b.w||GRID, b.h||GRID);
     });
 
-    enemies.forEach(en => {
-        ctx.font = en.t==='BOS'?"100px Arial":"40px Arial";
-        ctx.fillText(en.t==='K'?"💰": (en.t==='BOS'?"👴":"👨‍🏫"), en.x, en.y+35);
-    });
+    enemies.forEach(en => { ctx.font="40px Arial"; ctx.fillText(en.t==='K'?"💰":"👨‍🏫", en.x, en.y+35); });
+    items.forEach(it => { ctx.font="30px Arial"; ctx.fillText(it.t==='beer'?"🍺":"⭐", it.x, it.y+30); });
 
-    items.forEach(it => ctx.fillText(it.t==='beer'?"🍺":"⭐", it.x, it.y+30));
-    coins.forEach(c => ctx.fillText("🍩", c.x, c.y+30));
-    fx.forEach((f, i) => { f.y--; f.l--; ctx.fillText("🍩", f.x, f.y); if(f.l<0) fx.splice(i,1); });
-
-    // DIBUJAR HOMERO
-    if(p.star % 10 < 5) {
-        ctx.font = p.h + "px Arial";
-        ctx.fillText("👨‍🦲", p.x, p.y + p.h - 10);
-    }
+    // Homero
+    ctx.font = p.h + "px Arial";
+    ctx.fillText("👨‍🦲", p.x, p.y + p.h - 5);
 
     ctx.restore();
-    document.getElementById('donas').innerText = donas;
-    document.getElementById('vidas').innerText = vidas;
 }
 
-// Controles
-const ctrl = (id, k) => {
+// Controles touch
+const setupBtn = (id, key) => {
     const el = document.getElementById(id);
-    el.ontouchstart = (e) => { e.preventDefault(); if(k==='j') { if(p.jumps<2) { p.vy=-16; p.jumps++; } } else keys[k]=true; };
-    el.ontouchend = () => { if(k!=='j') keys[k]=false; };
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); if(key==='j') { if(p.jumps<2){p.vy=-15; p.jumps++;}} else keys[key]=true; });
+    el.addEventListener('touchend', () => { if(key!=='j') keys[key]=false; });
 };
-ctrl('left', 'left'); ctrl('right', 'right'); ctrl('jump', 'j');
+setupBtn('left', 'left'); setupBtn('right', 'right'); setupBtn('jump', 'j');
 
+window.addEventListener('resize', resize);
 function loop() { update(); draw(); requestAnimationFrame(loop); }
-window.onload = initLevel;
+init();
 </script>
 </body>
 </html>
