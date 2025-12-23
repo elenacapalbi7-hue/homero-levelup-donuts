@@ -3,51 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Odyssey FullView</title>
+    <title>Homer 25: Mechanics Fix</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #000; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #000b1a; }
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* UI de texto */
-        #ui { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; 
-              color: #FFD700; font-size: 18px; font-weight: bold; pointer-events: none; z-index: 10; }
+        /* UI */
+        #ui { position: absolute; top: 40px; width: 100%; display: flex; justify-content: space-around; 
+              color: #00FF00; font-family: 'Arial Black'; font-size: 18px; pointer-events: none; z-index: 10; }
         
-        /* Overlay de inicio/fin */
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-                   background: rgba(0,0,0,0.8); display: flex; flex-direction: column; 
-                   justify-content: center; align-items: center; color: white; z-index: 100; }
-        
-        .btn-start { padding: 25px 50px; font-size: 24px; background: #FFD700; border: none; 
-                     border-radius: 15px; font-weight: bold; color: #000; cursor: pointer; }
+        #mode-label { position: absolute; top: 70px; width: 100%; text-align: center; color: #FFF; font-size: 14px; z-index: 10; }
 
-        /* Guía visual de controles (opcional, se desvanece) */
-        .touch-guide { position: absolute; bottom: 20px; width: 100%; display: flex; 
-                       justify-content: space-between; padding: 0 20px; box-sizing: border-box; 
-                       color: rgba(255,255,255,0.2); pointer-events: none; font-size: 12px; }
+        /* Controles laterales para no estorbar */
+        .ctrl-zone { position: absolute; bottom: 20px; display: flex; gap: 15px; z-index: 100; }
+        #left-ctrl { left: 20px; }
+        #right-ctrl { right: 20px; }
+        
+        .btn { width: 75px; height: 75px; background: rgba(255,255,255,0.15); border: 2px solid #FFD700; 
+               border-radius: 50%; display: flex; justify-content: center; align-items: center; 
+               font-size: 30px; color: white; user-select: none; }
+        .btn:active { background: rgba(255,215,0,0.4); }
+
+        /* Overlay */
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+                   background: rgba(0,0,0,0.9); display: flex; flex-direction: column; 
+                   justify-content: center; align-items: center; color: white; z-index: 200; }
+        .btn-go { padding: 20px 40px; font-size: 22px; background: #FFD700; border: none; border-radius: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="game-container">
     <div id="ui">
-        <div>NIVEL: <span id="lvl">1</span></div>
-        <div>⏰: <span id="clocks">0</span>/10</div>
-        <div>❤️: <span id="lives">3</span></div>
+        <div>NIVEL <span id="lvl">1</span></div>
+        <div>⏰ <span id="clocks">0</span>/10</div>
+        <div>❤️ <span id="lives">3</span></div>
     </div>
+    <div id="mode-label" id="modeName">MODO: RECOLECTOR</div>
 
     <canvas id="gameCanvas"></canvas>
 
-    <div id="overlay">
-        <h1 id="title">HOMER 25</h1>
-        <p id="msg">Toca para empezar</p>
-        <button class="btn-start" id="mainAction">¡JUGAR!</button>
+    <div class="ctrl-zone" id="left-ctrl">
+        <div class="btn" id="btnL">⬅️</div>
+        <div class="btn" id="btnR">➡️</div>
     </div>
 
-    <div class="touch-guide">
-        <span>⬅️ TOCAR IZDA</span>
-        <span>SALTO: CENTRO 🔘</span>
-        <span>TOCAR DCHA ➡️</span>
+    <div class="ctrl-zone" id="right-ctrl">
+        <div class="btn" id="btnA">🔘</div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="title">HOMER RUN</h1>
+        <p id="msg">Prepárate...</p>
+        <button class="btn-go" onclick="startGame()">¡EMPEZAR!</button>
     </div>
 </div>
 
@@ -55,11 +64,12 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const lvlEl = document.getElementById('lvl'), livesEl = document.getElementById('lives'), 
-          clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay');
+          clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay'),
+          modeLabel = document.getElementById('mode-label');
 
     let level = 1, score = 0, lives = 3, isPlaying = false, frame = 0;
     let player = { x: 0, y: 0, vx: 0, vy: 0, grav: 0.8, jumps: 0 };
-    let items = [], obstacles = [];
+    let items = [], obstacles = [], platforms = [];
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -70,21 +80,35 @@
 
     function initLevel() {
         score = 0; clocksEl.innerText = "0/10"; lvlEl.innerText = level;
-        items = []; obstacles = []; frame = 0;
-        player.x = canvas.width / 2 - 25;
+        items = []; obstacles = []; platforms = []; frame = 0;
+        player.x = canvas.width / 2;
         player.y = canvas.height - 150;
         player.vx = 0; player.vy = 0;
-        
-        // Ajustar físicas según nivel
-        player.grav = (level === 3) ? 0.3 : 0.8; 
+
+        if(level === 2) {
+            modeLabel.innerText = "MODO: PLATAFORMAS MÓVILES";
+            platforms.push({x: 50, y: canvas.height-200, w: 150, h: 20});
+            platforms.push({x: canvas.width-200, y: canvas.height-350, w: 150, h: 20});
+        } else if(level === 3) {
+            modeLabel.innerText = "MODO: VUELO LIBRE";
+            player.grav = 0; // Sin gravedad para volar
+        } else {
+            modeLabel.innerText = "MODO: RECOLECTOR ACELERADO";
+            player.grav = 0.8;
+        }
     }
 
     function spawn() {
         if(items.length < 1) {
-            items.push({ x: 50 + Math.random()*(canvas.width-100), y: -50, vy: 3 + (level * 0.2) });
+            items.push({ 
+                x: 50 + Math.random()*(canvas.width-100), 
+                y: (level === 3) ? Math.random()*canvas.height : -50, 
+                vy: (level === 3) ? 0 : 3 + (level * 0.5) 
+            });
         }
-        if(frame % (150 - (level * 2)) === 0) {
-            obstacles.push({ x: canvas.width, y: canvas.height - 110, vx: -5 - (level*0.4) });
+        // Obstáculos más frecuentes en niveles altos
+        if(frame % (Math.max(60, 160 - level * 10)) === 0) {
+            obstacles.push({ x: canvas.width, y: canvas.height - 120, vx: -6 - (level) });
         }
     }
 
@@ -93,20 +117,27 @@
         frame++;
         spawn();
 
-        player.vy += player.grav;
-        player.x += player.vx;
         player.y += player.vy;
-
-        // Suelo
-        if(player.y > canvas.height - 100) {
-            player.y = canvas.height - 100;
-            player.vy = 0;
-            player.jumps = 0;
+        player.x += player.vx;
+        
+        if(level !== 3) {
+            player.vy += player.grav;
+            // Suelo normal
+            if(player.y > canvas.height - 100) {
+                player.y = canvas.height - 100;
+                player.vy = 0;
+                player.jumps = 0;
+            }
+        } else {
+            // Fricción en vuelo para que no patine tanto
+            player.vx *= 0.95;
+            player.vy *= 0.95;
+            if(player.y < 0) player.y = 0;
+            if(player.y > canvas.height-100) player.y = canvas.height-100;
         }
 
-        // Límites laterales
         if(player.x < 0) player.x = 0;
-        if(player.x > canvas.width - 50) player.x = canvas.width - 50;
+        if(player.x > canvas.width-50) player.x = canvas.width-50;
 
         // Items
         items.forEach((it, i) => {
@@ -126,75 +157,72 @@
                 lives--; livesEl.innerText = lives; obstacles.splice(i, 1);
                 if(lives <= 0) gameOver();
             }
-            if(o.x < -50) obstacles.splice(i, 1);
+            if(o.x < -100) obstacles.splice(i, 1);
         });
     }
 
     function draw() {
-        // Fondo con efecto Nivel 2 (Parpadeo)
-        if(level === 2 && frame % 60 < 10) ctx.fillStyle = "#111";
-        else ctx.fillStyle = "#000";
+        ctx.fillStyle = "#000b1a";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Suelo
-        ctx.fillStyle = "#FFD700";
-        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+        // Suelo neón
+        ctx.fillStyle = (level === 2) ? "#FF0000" : "#00FF00";
+        ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
 
-        // Elementos
+        // Plataformas nivel 2
+        ctx.fillStyle = "#00BFFF";
+        platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+
+        // Dibujar elementos
         ctx.font = "40px Arial";
         items.forEach(it => ctx.fillText("⏰", it.x, it.y));
         obstacles.forEach(o => ctx.fillText("📦", o.x, o.y + 40));
 
         // Homero
         ctx.font = "60px Arial";
-        ctx.fillText("🏃‍♂️", player.x, player.y + 50);
+        ctx.fillText((level === 3 ? "🛸" : "🏃‍♂️"), player.x, player.y + 40);
 
         if(isPlaying) requestAnimationFrame(draw);
         update();
     }
 
-    // CONTROL TÁCTIL TOTAL (Sin botones que estorben)
-    window.addEventListener('touchstart', (e) => {
-        if(!isPlaying) return;
-        const touchX = e.touches[0].clientX;
-        const screenW = window.innerWidth;
+    // CONTROLES MANUALES (Flechas + Botón)
+    const btnL = document.getElementById('btnL'), btnR = document.getElementById('btnR'), btnA = document.getElementById('btnA');
 
-        if(touchX < screenW * 0.3) { // Izquierda
-            player.vx = -8;
-        } else if(touchX > screenW * 0.7) { // Derecha
-            player.vx = 8;
-        } else { // Centro (Salto)
+    btnL.ontouchstart = (e) => { e.preventDefault(); if(level===3) player.vy = -8; else player.vx = -8; };
+    btnR.ontouchstart = (e) => { e.preventDefault(); if(level===3) player.vy = 8; else player.vx = 8; };
+    btnL.ontouchend = btnR.ontouchend = () => { if(level!==3) player.vx = 0; };
+
+    btnA.ontouchstart = (e) => {
+        e.preventDefault();
+        if(level === 3) {
+            player.vx = 10;
+        } else {
             if(player.jumps < 2) {
                 player.vy = -18;
                 player.jumps++;
             }
         }
-    });
+    };
 
-    window.addEventListener('touchend', () => {
-        player.vx = 0;
-    });
+    function startGame() {
+        overlay.style.display = "none";
+        initLevel();
+        isPlaying = true;
+        draw();
+    }
 
     function nextLevel() {
         isPlaying = false; level++;
         overlay.style.display = "flex";
-        document.getElementById('title').innerText = "¡SÍ!";
-        document.getElementById('msg').innerText = "Nivel " + (level-1) + " completado.";
+        document.getElementById('msg').innerText = "¡Nivel Completado!";
     }
 
     function gameOver() {
         isPlaying = false; level = 1; lives = 3;
         overlay.style.display = "flex";
-        document.getElementById('title').innerText = "¡D'OH!";
-        document.getElementById('msg').innerText = "Vuelve a intentarlo";
+        document.getElementById('msg').innerText = "GAME OVER";
     }
-
-    document.getElementById('mainAction').onclick = () => {
-        overlay.style.display = "none";
-        initLevel();
-        isPlaying = true;
-        draw();
-    };
 </script>
 </body>
 </html>
