@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Homer: Springfield Quest</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: monospace; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Courier New', Courier, monospace; }
         #ui { position: absolute; top: 0; width: 100%; z-index: 100; pointer-events: none; }
         .hud { 
             background: #e74c3c; color: white; padding: 10px; 
@@ -32,14 +32,27 @@ const ctx = canvas.getContext('2d');
 
 let nivel = 1, puntos = 0, vidas = 3, frame = 0, camX = 0;
 let items = [], enemigos = [], bloques = [];
-let h = { x: 0, y: 0, w: 40, h: 55, vx: 0, vy: 0, saltos: 0, dirX: 0, dirY: 0 };
 
-// --- CONTROLES ---
+// Velocidad constante del juego
+const VEL_FIJA = 6;
+
+let h = { 
+    x: 0, y: 0, w: 40, h: 55, 
+    vx: 0, vy: 0, saltos: 0, 
+    movIzquierda: false, movDerecha: false, movArriba: false, movAbajo: false 
+};
+
+// --- CONTROLES MEJORADOS (SIN ACELERACIÓN) ---
 let tStartX = 0, tStartY = 0;
+
 window.addEventListener('touchstart', e => {
     tStartX = e.touches[0].clientX;
     tStartY = e.touches[0].clientY;
-    if ((nivel === 1 || nivel === 4) && h.saltos < 2) { h.vy = -14; h.saltos++; }
+    // Salto para niveles de plataforma
+    if ((nivel === 1 || nivel === 4) && h.saltos < 2) {
+        h.vy = -14;
+        h.saltos++;
+    }
 });
 
 window.addEventListener('touchmove', e => {
@@ -47,61 +60,99 @@ window.addEventListener('touchmove', e => {
     let dx = e.touches[0].clientX - tStartX;
     let dy = e.touches[0].clientY - tStartY;
 
-    // Movimiento Horizontal (Todos los niveles)
-    if (dx > 30) h.dirX = 1; else if (dx < -30) h.dirX = -1; else h.dirX = 0;
-
-    // Movimiento Vertical (Solo Nivel 2 y 3)
-    if (nivel === 2 || nivel === 3) {
-        if (dy > 30) h.dirY = 1; else if (dy < -30) h.dirY = -1; else h.dirY = 0;
+    // Umbral de 20px para detectar intención, pero velocidad siempre es VEL_FIJA
+    h.movDerecha = (dx > 20);
+    h.movIzquierda = (dx < -20);
+    
+    if (nivel === 2) {
+        h.movAbajo = (dy > 20);
+        h.movArriba = (dy < -20);
     }
 }, {passive: false});
 
-window.addEventListener('touchend', () => { h.dirX = 0; h.dirY = 0; });
+window.addEventListener('touchend', () => {
+    h.movDerecha = h.movIzquierda = h.movArriba = h.movAbajo = false;
+});
 
 function prepararNivel() {
     items = []; enemigos = []; bloques = []; camX = 0;
-    h.vx = 0; h.vy = 0; h.dirX = 0; h.dirY = 0;
+    h.vx = 0; h.vy = 0; h.saltos = 0;
     
-    if (nivel === 1) { h.x = 80; h.y = canvas.height - 150; }
-    else if (nivel === 2) { h.x = canvas.width/2; h.y = canvas.height/2; }
-    else if (nivel === 3) { h.x = 50; h.y = 50; }
+    if (nivel === 1) { 
+        h.x = 80; h.y = canvas.height - 150; 
+    }
+    else if (nivel === 2) { 
+        h.x = canvas.width/2; h.y = canvas.height/2; 
+    }
     else if (nivel === 4) {
         h.x = 100; h.y = canvas.height - 150;
-        for(let i=0; i<150; i++) {
+        // Suelo de ladrillo infinito
+        for(let i=0; i<200; i++) {
             bloques.push({x: i*40, y: canvas.height-40, t:'ladrillo'});
-            if([15, 18, 21, 40, 43].includes(i)) bloques.push({x: i*40, y: canvas.height-180, t:'?'});
+            // Bloques con donas (interrogación)
+            if([10, 14, 18, 22, 35, 38, 41].includes(i)) {
+                bloques.push({x: i*40, y: canvas.height-180, t:'?'});
+            }
         }
-        for(let i=0; i<8; i++) enemigos.push({x: 1000 + i*800, y: canvas.height-90, t:'f'});
+        // Enemigos Flanders
+        for(let i=0; i<10; i++) enemigos.push({x: 1000 + i*700, y: canvas.height-90, t:'f'});
     }
 }
 
 function morir() {
-    vidas--; if (vidas <= 0) { alert("GAME OVER"); nivel = 1; vidas = 3; }
-    puntos = 0; prepararNivel();
+    vidas--;
+    if (vidas <= 0) { alert("GAME OVER"); nivel = 1; vidas = 3; }
+    puntos = 0;
+    prepararNivel();
+}
+
+// --- LOGICA DE MOVIMIENTO ---
+function aplicarMovimiento() {
+    h.vx = 0;
+    if (h.movDerecha) h.vx = VEL_FIJA;
+    if (h.movIzquierda) h.vx = -VEL_FIJA;
+
+    if (nivel === 2) {
+        h.vy = 0;
+        if (h.movAbajo) h.vy = VEL_FIJA;
+        if (h.movArriba) h.vy = -VEL_FIJA;
+    }
 }
 
 function motorNivel1() {
-    ctx.fillStyle = "#f1c40f"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    ctx.fillStyle = "#f1c40f"; ctx.fillRect(0,0,canvas.width, canvas.height); // Arena
+    ctx.fillStyle = "#d35400"; ctx.fillRect(0, canvas.height-40, canvas.width, 40); // Suelo
+
     h.vy += 0.8; h.y += h.vy;
-    if(h.y > canvas.height - 105) { h.y = canvas.height - 105; h.vy = 0; h.saltos = 0; }
-    if(frame % 100 === 0) items.push({x: canvas.width, y: canvas.height-95, t:'c'});
+    if(h.y > canvas.height - 95) { h.y = canvas.height - 95; h.vy = 0; h.saltos = 0; }
+
+    // Generar Donas y Cactus (Asegurando que las donas estén bajas para verlas)
+    if(frame % 80 === 0) items.push({x: canvas.width, y: canvas.height-85, t:'c'}); // Cactus
+    if(frame % 120 === 0) items.push({x: canvas.width, y: canvas.height-180, t:'d'}); // Dona baja
+
     items.forEach((it, i) => {
-        it.x -= 6; ctx.font = "40px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
-        if(Math.hypot(h.x - it.x, h.y - it.y) < 40) { if(it.t === 'c') morir(); else { items.splice(i,1); puntos++; } }
+        it.x -= VEL_FIJA;
+        ctx.font = "40px Arial";
+        ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
+        
+        if(Math.hypot(h.x - it.x, h.y - it.y) < 40) {
+            if(it.t === 'c') morir();
+            else { items.splice(i,1); puntos++; }
+        }
     });
+
     ctx.fillText("👨‍🦲", h.x, h.y);
-    if(puntos >= 10) { nivel = 2; puntos = 0; alert("¡Nivel 2: Cementerio!"); prepararNivel(); }
+    if(puntos >= 10) { nivel = 2; puntos = 0; alert("¡Nivel 2: Supervivencia!"); prepararNivel(); }
 }
 
 function motorNivel2() {
     ctx.fillStyle = "#2c3e50"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    h.x += h.dirX * 6; h.y += h.dirY * 6;
-    // Límites de pantalla
-    h.x = Math.max(0, Math.min(canvas.width - h.w, h.x));
-    h.y = Math.max(0, Math.min(canvas.height - h.h, h.y));
+    h.x += h.vx; h.y += h.vy;
+    h.x = Math.max(0, Math.min(canvas.width - 40, h.x));
+    h.y = Math.max(0, Math.min(canvas.height - 40, h.y));
 
-    if(frame % 60 === 0) enemigos.push({x: Math.random()*canvas.width, y: -50});
-    if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t:'d'});
+    if(frame % 50 === 0) enemigos.push({x: Math.random()*canvas.width, y: -50});
+    if(frame % 80 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t:'d'});
 
     enemigos.forEach(en => {
         let ang = Math.atan2(h.y - en.y, h.x - en.x);
@@ -109,44 +160,76 @@ function motorNivel2() {
         ctx.fillText("🧟", en.x, en.y);
         if(Math.hypot(h.x - en.x, h.y - en.y) < 35) morir();
     });
-    items.forEach((it, i) => { ctx.fillText("🍩", it.x, it.y); if(Math.hypot(h.x - it.x, h.y - it.y) < 40) { items.splice(i,1); puntos++; } });
+    items.forEach((it, i) => { 
+        ctx.fillText("🍩", it.x, it.y); 
+        if(Math.hypot(h.x - it.x, h.y - it.y) < 40) { items.splice(i,1); puntos++; } 
+    });
     ctx.fillText("👨‍🦲", h.x, h.y);
     if(puntos >= 10) { nivel = 4; puntos = 0; alert("¡Nivel Final: Springfield!"); prepararNivel(); }
 }
 
 function motorNivel4() {
-    ctx.fillStyle = "#5c94fc"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    h.x += h.dirX * 6; h.vy += 0.8; h.y += h.vy;
-    camX = h.x - 150;
+    ctx.fillStyle = "#5c94fc"; ctx.fillRect(0,0,canvas.width, canvas.height); // Azul Mario
+    
+    h.x += h.vx; h.vy += 0.8; h.y += h.vy;
+    camX = h.x - 100;
+
     ctx.save(); ctx.translate(-camX, 0);
-    // Suelo y Bloques
+
+    // Decoración: Nubes y Montañas
+    ctx.font = "80px Arial";
+    ctx.fillText("☁️", 300, 150); ctx.fillText("☁️", 800, 100);
+    ctx.fillText("⛰️", 500, canvas.height-120);
+
+    // Dibujar Bloques
     bloques.forEach(b => {
         ctx.fillStyle = b.t === '?' ? "#f39c12" : "#e76e33";
-        ctx.fillRect(b.x, b.y, 40, 40); ctx.strokeRect(b.x, b.y, 40, 40);
+        ctx.fillRect(b.x, b.y, 40, 40);
+        ctx.strokeStyle = "black"; ctx.strokeRect(b.x, b.y, 40, 40);
+        if(b.t === '?') { ctx.fillStyle="white"; ctx.font="20px Arial"; ctx.fillText("?", b.x+12, b.y+28); }
+
+        // Colisión de plataforma
         if(h.x+h.w > b.x && h.x < b.x+40 && h.y+h.h > b.y && h.y < b.y+40) {
             if(h.vy > 0 && h.y+h.h-h.vy <= b.y) { h.y = b.y-h.h; h.vy = 0; h.saltos = 0; }
             else if(h.vy < 0) { h.vy = 2; if(b.t === '?') { b.t = 'ladrillo'; puntos++; } }
         }
     });
+
     enemigos.forEach((en, i) => {
-        en.x -= 2; ctx.fillText("👨‍🏫", en.x, en.y);
-        if(Math.hypot(h.x - en.x, h.y - en.y) < 40) { if(h.vy > 0) { enemigos.splice(i,1); h.vy = -10; } else morir(); }
+        en.x -= 2; ctx.font="40px Arial"; ctx.fillText("👨‍🏫", en.x, en.y);
+        if(Math.hypot(h.x - en.x, h.y - en.y) < 40) {
+            if(h.vy > 0) { enemigos.splice(i,1); h.vy = -10; } 
+            else morir();
+        }
     });
-    ctx.fillText("👨‍🦲", h.x, h.y + 45);
-    ctx.fillText("🏠", 5000, canvas.height-120);
+
+    ctx.font="50px Arial"; ctx.fillText("👨‍🦲", h.x, h.y+45);
+    ctx.fillText("🏠", 5000, canvas.height-120); // La Meta
     if(h.x > 5000) { alert("¡GANASTE!"); nivel = 1; prepararNivel(); }
     ctx.restore();
 }
 
 function loop() {
-    frame++; ctx.clearRect(0,0, canvas.width, canvas.height);
+    frame++;
+    ctx.clearRect(0,0, canvas.width, canvas.height);
+    aplicarMovimiento();
+    
     document.getElementById('puntos').innerText = String(puntos).padStart(6, '0');
     document.getElementById('vidas').innerText = vidas;
-    if(nivel === 1) motorNivel1(); else if(nivel === 2) motorNivel2(); else motorNivel4();
+
+    if(nivel === 1) motorNivel1(); 
+    else if(nivel === 2) motorNivel2(); 
+    else motorNivel4();
+
     requestAnimationFrame(loop);
 }
 
-window.onload = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; prepararNivel(); loop(); };
+window.onload = () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    prepararNivel();
+    loop();
+};
 </script>
 </body>
 </html>
