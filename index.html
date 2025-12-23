@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer: Instant Follow</title>
+    <title>Homer: Springfield World 1-1</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Courier New', Courier, monospace; }
         #ui { position: absolute; top: 0; width: 100%; z-index: 100; pointer-events: none; }
         .hud { 
             background: #e74c3c; color: white; padding: 10px; 
@@ -33,142 +33,144 @@ const ctx = canvas.getContext('2d');
 let nivel = 1, puntos = 0, vidas = 3, frame = 0, camX = 0;
 let items = [], enemigos = [], bloques = [];
 
-// Homero
-let h = { x: 0, y: 0, w: 50, h: 60, vy: 0, saltos: 0, dirX: 0 };
+// JUGADOR: SIN ACELERACIÓN, VELOCIDAD CONSTANTE
+let h = { x: 0, y: 0, w: 40, h: 54, vx: 0, vy: 0, saltos: 0, enSuelo: false };
+const VEL_CAMINAR = 6; 
 
-// --- CONTROLES: SEGUIMIENTO INSTANTÁNEO ---
-function manejarToque(e) {
-    e.preventDefault();
-    const touch = e.touches[0];
+// --- CONTROLES SIN RETRASO ---
+window.addEventListener('touchstart', e => {
+    const tx = e.touches[0].clientX;
+    const ty = e.touches[0].clientY;
     
     if (nivel === 2) {
-        // En nivel 2, Homero se pega al dedo exactamente
-        h.x = touch.clientX - h.w / 2;
-        h.y = touch.clientY - h.h / 2;
+        // En nivel 2: Posicionamiento instantáneo bajo el dedo
+        h.x = tx - h.w/2;
+        h.y = ty - h.h/2;
     } else {
-        // En niveles 1 y 4, solo detectamos lado para caminar
-        h.dirX = (touch.clientX > window.innerWidth / 2) ? 1 : -1;
-    }
-}
-
-window.addEventListener('touchstart', (e) => {
-    manejarToque(e);
-    // Salto para niveles de plataforma
-    if ((nivel === 1 || nivel === 4) && h.saltos < 2) {
-        h.vy = -14;
-        h.saltos++;
+        // En niveles 1 y 4: Caminar y Saltar
+        h.vx = (tx > window.innerWidth / 2) ? VEL_CAMINAR : -VEL_CAMINAR;
+        if (h.saltos < 2) { h.vy = -15; h.saltos++; }
     }
 }, {passive: false});
 
-window.addEventListener('touchmove', manejarToque, {passive: false});
-window.addEventListener('touchend', () => { h.dirX = 0; });
+window.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const tx = e.touches[0].clientX;
+    const ty = e.touches[0].clientY;
+
+    if (nivel === 2) {
+        h.x = tx - h.w/2;
+        h.y = ty - h.h/2;
+    } else {
+        h.vx = (tx > window.innerWidth / 2) ? VEL_CAMINAR : -VEL_CAMINAR;
+    }
+}, {passive: false});
+
+window.addEventListener('touchend', () => { h.vx = 0; });
 
 function prepararNivel() {
     items = []; enemigos = []; bloques = []; camX = 0;
-    h.vy = 0; h.saltos = 0;
+    h.vx = 0; h.vy = 0; h.saltos = 0;
     
     if (nivel === 1) { h.x = 80; h.y = canvas.height - 150; }
     else if (nivel === 2) { h.x = canvas.width/2; h.y = canvas.height/2; }
     else if (nivel === 4) {
         h.x = 100; h.y = canvas.height - 150;
-        // Suelo de ladrillo estilo Mario
-        for(let i=0; i<200; i++) {
-            bloques.push({x: i*40, y: canvas.height-40, t:'ladrillo'});
-            if([12, 16, 20, 30, 32].includes(i)) bloques.push({x: i*40, y: canvas.height-180, t:'?'});
+        // MAPA NIVEL 4: CLON SUPER MARIO 1-1
+        for(let i=0; i<300; i++) {
+            // Suelo doble de ladrillo
+            bloques.push({x: i*40, y: canvas.height-40, t:'L'});
+            bloques.push({x: i*40, y: canvas.height-80, t:'L'});
+            
+            // Estructuras clásicas
+            if(i === 15) bloques.push({x: i*40, y: canvas.height-200, t:'?'});
+            if(i >= 20 && i <= 24) bloques.push({x: i*40, y: canvas.height-200, t: (i%2==0)?'L':'?'});
+            
+            // Tuberías verdes (como las de Mario)
+            if(i === 35 || i === 50) {
+                bloques.push({x: i*40, y: canvas.height-120, w:80, h:40, t:'T'});
+                bloques.push({x: i*40, y: canvas.height-160, w:80, h:40, t:'T'});
+            }
         }
     }
 }
 
 function morir() {
     vidas--;
-    if (vidas <= 0) { alert("Game Over"); nivel = 1; vidas = 3; }
-    puntos = 0;
-    prepararNivel();
+    if (vidas <= 0) { alert("GAME OVER"); nivel = 1; vidas = 3; }
+    puntos = 0; prepararNivel();
 }
 
 function motorNivel1() {
     ctx.fillStyle = "#f1c40f"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    ctx.fillStyle = "#d35400"; ctx.fillRect(0, canvas.height-40, canvas.width, 40);
-
-    h.vy += 0.8; h.y += h.vy;
-    if(h.y > canvas.height - 100) { h.y = canvas.height - 100; h.vy = 0; h.saltos = 0; }
-
-    if(frame % 80 === 0) items.push({x: canvas.width, y: canvas.height-80, t:'c'}); // Cactus
-    if(frame % 90 === 0) items.push({x: canvas.width, y: canvas.height-180, t:'d'}); // Dona
-
+    ctx.fillStyle = "#d35400"; ctx.fillRect(0, canvas.height-80, canvas.width, 80);
+    h.vy += 0.9; h.y += h.vy;
+    if(h.y > canvas.height - 134) { h.y = canvas.height - 134; h.vy = 0; h.saltos = 0; }
+    if(frame % 90 === 0) items.push({x: canvas.width, y: canvas.height-120, t:'c'});
+    if(frame % 110 === 0) items.push({x: canvas.width, y: canvas.height-250, t:'d'});
     items.forEach((it, i) => {
-        it.x -= 7;
-        ctx.font = "45px Arial";
-        ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
-        if(Math.hypot(h.x + 25 - it.x, h.y + 30 - it.y) < 40) {
-            if(it.t === 'c') morir();
-            else { items.splice(i,1); puntos++; }
+        it.x -= 6; ctx.font = "40px Arial"; ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
+        if(Math.hypot(h.x - it.x, h.y - it.y) < 40) {
+            if(it.t === 'c') morir(); else { items.splice(i,1); puntos++; }
         }
     });
-    ctx.font = "60px Arial"; ctx.fillText("👨‍🦲", h.x, h.y);
-    if(puntos >= 10) { nivel = 2; puntos = 0; prepararNivel(); }
+    ctx.font = "60px Arial"; ctx.fillText("👨‍🦲", h.x, h.y + 40);
+    if(puntos >= 10) { nivel = 2; puntos = 0; alert("NIVEL 2: SUPERVIVENCIA"); prepararNivel(); }
 }
 
 function motorNivel2() {
     ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    
-    // Generación de enemigos
     if(frame % 60 === 0) enemigos.push({x: Math.random()*canvas.width, y: -50});
-    if(frame % 100 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t:'d'});
-
+    if(frame % 80 === 0) items.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, t:'d'});
     enemigos.forEach(en => {
-        // Los zombies siguen a Homero pero son esquivables
         let ang = Math.atan2(h.y - en.y, h.x - en.x);
-        en.x += Math.cos(ang) * 2.5;
-        en.y += Math.sin(ang) * 2.5;
+        en.x += Math.cos(ang) * 2.5; en.y += Math.sin(ang) * 2.5;
         ctx.font = "40px Arial"; ctx.fillText("🧟", en.x, en.y);
         if(Math.hypot(h.x - en.x, h.y - en.y) < 40) morir();
     });
-
-    items.forEach((it, i) => {
-        ctx.font = "40px Arial"; ctx.fillText("🍩", it.x, it.y);
-        if(Math.hypot(h.x - it.x, h.y - it.y) < 40) { items.splice(i,1); puntos++; }
-    });
-
-    ctx.font = "60px Arial"; ctx.fillText("👨‍🦲", h.x, h.y);
-    if(puntos >= 10) { nivel = 4; puntos = 0; prepararNivel(); }
+    items.forEach((it, i) => { ctx.fillText("🍩", it.x, it.y); if(Math.hypot(h.x - it.x, h.y - it.y) < 40) { items.splice(i,1); puntos++; } });
+    ctx.font = "60px Arial"; ctx.fillText("👨‍🦲", h.x, h.y + 40);
+    if(puntos >= 10) { nivel = 4; puntos = 0; alert("NIVEL 4: SPRINGFIELD WORLD"); prepararNivel(); }
 }
 
 function motorNivel4() {
-    ctx.fillStyle = "#5c94fc"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    h.x += h.dirX * 7;
-    h.vy += 0.8; h.y += h.vy;
-    camX = h.x - 100;
-
+    ctx.fillStyle = "#5c94fc"; ctx.fillRect(0,0,canvas.width, canvas.height); // Azul Mario
+    h.x += h.vx; h.vy += 0.9; h.y += h.vy;
+    camX = h.x - 120;
     ctx.save(); ctx.translate(-camX, 0);
+    
+    // Nubes y Montañas de fondo (clonando la imagen)
+    ctx.font = "80px Arial"; ctx.fillText("☁️", 400, 150); ctx.fillText("⛰️", 600, canvas.height-150);
+
     bloques.forEach(b => {
-        ctx.fillStyle = b.t === '?' ? "#f39c12" : "#e76e33";
-        ctx.fillRect(b.x, b.y, 40, 40);
-        ctx.strokeStyle = "black"; ctx.strokeRect(b.x, b.y, 40, 40);
+        if(b.t === 'L') ctx.fillStyle = "#e76e33"; // Ladrillo
+        else if(b.t === '?') ctx.fillStyle = "#f39c12"; // Bloque ?
+        else ctx.fillStyle = "#27ae60"; // Tubería verde
         
-        // Colisión sólida
-        if(h.x+h.w > b.x && h.x < b.x+40 && h.y+h.h > b.y && h.y < b.y+40) {
+        let bw = b.w || 40;
+        ctx.fillRect(b.x, b.y, bw, b.h || 40);
+        ctx.strokeStyle = "black"; ctx.strokeRect(b.x, b.y, bw, b.h || 40);
+        
+        // Colisiones sólidas exactas
+        if(h.x+h.w > b.x && h.x < b.x+bw && h.y+h.h > b.y && h.y < b.y+40) {
             if(h.vy > 0 && h.y+h.h-h.vy <= b.y) { h.y = b.y-h.h; h.vy = 0; h.saltos = 0; }
-            else if(h.vy < 0) { h.vy = 2; if(b.t === '?') { b.t = 'ladrillo'; puntos++; } }
+            else if(h.vy < 0) { h.vy = 3; if(b.t === '?') { b.t = 'L'; puntos++; } }
         }
     });
 
     ctx.font = "60px Arial"; ctx.fillText("👨‍🦲", h.x, h.y + 50);
-    ctx.fillText("🏠", 5000, canvas.height-120);
-    if(h.x > 5000) { alert("¡Ganaste!"); nivel = 1; prepararNivel(); }
+    ctx.fillText("🏠", 5000, canvas.height-160); // Meta
+    if(h.x > 5000) { alert("¡SPRINGFIELD A SALVO!"); nivel = 1; prepararNivel(); }
     ctx.restore();
 }
 
 function loop() {
-    frame++;
-    ctx.clearRect(0,0, canvas.width, canvas.height);
+    frame++; ctx.clearRect(0,0, canvas.width, canvas.height);
     document.getElementById('puntos').innerText = String(puntos).padStart(6, '0');
     document.getElementById('vidas').innerText = vidas;
-
     if(nivel === 1) motorNivel1();
     else if(nivel === 2) motorNivel2();
     else motorNivel4();
-
     requestAnimationFrame(loop);
 }
 
