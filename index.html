@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Runner: Variedad Total</title>
+    <title>Homer Runner: Calle Springfield</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; overflow: hidden; }
-        #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 18px; pointer-events: none; }
+        body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #87CEEB; overflow: hidden; }
+        #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 20px; pointer-events: none; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
         .btn-action { padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #b8860b; }
         #controls { position: absolute; bottom: 120px; width: 100%; display: flex; justify-content: center; z-index: 20; }
@@ -25,75 +25,65 @@
 
     <div id="overlay">
         <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Cada tramo es una aventura!<br>Atrapa 10 relojes para ganar.</p>
+        <p id="msg">¡Corre por la ciudad!<br>Esquiva los obstáculos urbanos.</p>
         <button class="btn-action" onclick="startGame()">¡JUGAR!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
-
     <div id="controls"><div class="jump-btn" id="btnJump">⬆️</div></div>
 </div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const clocksEl = document.getElementById('clocks');
-    const donutsEl = document.getElementById('donuts');
-    const livesEl = document.getElementById('lives');
-    const overlay = document.getElementById('overlay');
+    const clocksEl = document.getElementById('clocks'), donutsEl = document.getElementById('donuts'), livesEl = document.getElementById('lives'), overlay = document.getElementById('overlay');
 
     let isPlaying = false, scoreClocks = 0, scoreDonuts = 0, lives = 3, frameCount = 0;
-    let platforms = [], items = [], gameSpeed = 5;
+    let groundBlocks = [], items = [], gameSpeed = 5;
+    let totalHoles = 0; // Para limitar a solo 3 en todo el juego
 
-    const player = { x: 70, y: 0, w: 60, h: 80, vy: 0, gravity: 0.6, jumpPower: -13, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
+    const player = { x: 80, y: 0, w: 60, h: 80, vy: 0, gravity: 0.6, jumpPower: -13, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
     resize();
 
-    // GENERADOR DE SECUENCIAS VARIADAS
-    function spawnSequence() {
-        let x = canvas.width + 100;
-        let groundY = canvas.height - 60;
-        let type = Math.floor(Math.random() * 6);
+    // Sistema de suelo sólido con muy pocos huecos
+    function updateGround() {
+        if (groundBlocks.length === 0 || groundBlocks[groundBlocks.length - 1].x < canvas.width) {
+            let x = groundBlocks.length === 0 ? 0 : groundBlocks[groundBlocks.length - 1].x + 100;
+            let isHole = false;
 
-        switch(type) {
-            case 0: // El Estacionamiento
-                platforms.push({x, y: groundY, w: 300, h: 60});
-                items.push({x: x+50, y: groundY-60, size: 50, t: 'bad', e: '🚗'});
-                items.push({x: x+150, y: groundY-180, size: 45, t: 'clock', e: '⏰'});
-                break;
-            case 1: // La Obra (Salto sobre pozo)
-                platforms.push({x, y: groundY, w: 100, h: 60});
-                items.push({x: x+20, y: groundY-50, size: 45, t: 'bad', e: '🚧'});
-                platforms.push({x: x+220, y: groundY, w: 150, h: 60});
-                items.push({x: x+250, y: groundY-150, size: 40, t: 'donut', e: '🍩'});
-                break;
-            case 2: // El Castillo de Nubes
-                platforms.push({x, y: groundY, w: 100, h: 60});
-                platforms.push({x: x+120, y: groundY-120, w: 100, h: 20, e: '☁️'});
-                platforms.push({x: x+240, y: groundY-220, w: 100, h: 20, e: '☁️'});
-                items.push({x: x+270, y: groundY-270, size: 45, t: 'clock', e: '⏰'});
-                platforms.push({x: x+360, y: groundY, w: 150, h: 60});
-                break;
-            case 3: // El Callejón de las Donas
-                platforms.push({x, y: groundY, w: 400, h: 60});
-                for(let i=0; i<3; i++) items.push({x: x+100+(i*60), y: groundY-140, size: 35, t: 'donut', e: '🍩'});
-                items.push({x: x+180, y: groundY-50, size: 45, t: 'bad', e: '🗑️'});
-                break;
-            case 4: // La Entrega Apilada
-                platforms.push({x, y: groundY, w: 300, h: 60});
-                items.push({x: x+50, y: groundY-50, size: 45, t: 'bad', e: '📦'});
-                items.push({x: x+100, y: groundY-50, size: 45, t: 'bad', e: '📦'});
-                items.push({x: x+150, y: groundY-150, size: 45, t: 'clock', e: '⏰'});
-                break;
-            case 5: // El Hidrante y la Bici
-                platforms.push({x, y: groundY, w: 350, h: 60});
-                items.push({x: x+80, y: groundY-50, size: 40, t: 'bad', e: '💧'});
-                items.push({x: x+220, y: groundY-50, size: 50, t: 'bad', e: '🚲'});
-                items.push({x: x+150, y: groundY-180, size: 40, t: 'donut', e: '🍩'});
-                break;
+            // Solo permite un hueco si no se ha llegado al límite de 3 y por puro azar raro
+            if (totalHoles < 3 && frameCount > 500 && Math.random() < 0.02) {
+                isHole = true;
+                totalHoles++;
+            }
+
+            groundBlocks.push({ x: x, y: canvas.height - 60, w: 105, h: 60, isHole: isHole });
+            
+            // Si NO es un hueco, hay chance de poner un obstáculo DIFERENTE encima
+            if (!isHole && Math.random() < 0.15) {
+                spawnRandomObstacle(x);
+            }
         }
+    }
+
+    function spawnRandomObstacle(x) {
+        const obs = [
+            {e: '🚗', t: 'bad', s: 60}, // Auto
+            {e: '🚧', t: 'bad', s: 50}, // Valla
+            {e: '🗑️', t: 'bad', s: 45}, // Basura
+            {e: '💧', t: 'bad', s: 40}, // Hidrante
+            {e: '📦', t: 'bad', s: 45}, // Caja
+            {e: '🚲', t: 'bad', s: 50}, // Bici
+            {e: '⏰', t: 'clock', s: 45}, // Reloj
+            {e: '🍩', t: 'donut', s: 40}  // Dona
+        ];
+        let chosen = obs[Math.floor(Math.random() * obs.length)];
+        // Los premios a veces van altos para usar el doble salto
+        let yPos = (chosen.t !== 'bad' && Math.random() > 0.5) ? canvas.height - 180 : canvas.height - 105;
+        items.push({ x: x, y: yPos, size: chosen.s, t: chosen.t, e: chosen.e });
     }
 
     function update() {
@@ -101,11 +91,12 @@
         player.vy += player.gravity; player.y += player.vy;
         let onGround = false;
 
-        platforms.forEach(p => {
-            p.x -= gameSpeed;
-            if (player.x + player.w > p.x && player.x < p.x + p.w &&
-                player.y + player.h > p.y && player.y + player.h < p.y + p.vy + 12 && player.vy >= 0) {
-                player.y = p.y - player.h; player.vy = 0; player.jumps = 0; onGround = true;
+        updateGround();
+        groundBlocks.forEach(b => {
+            b.x -= gameSpeed;
+            if (!b.isHole && player.x + player.w > b.x && player.x < b.x + b.w &&
+                player.y + player.h > b.y && player.y + player.h < b.y + player.vy + 10 && player.vy >= 0) {
+                player.y = b.y - player.h; player.vy = 0; player.jumps = 0; onGround = true;
             }
         });
 
@@ -121,33 +112,31 @@
             if (it.x < -100) items.splice(i, 1);
         }
 
-        if (frameCount % 110 === 0) spawnSequence();
-        platforms = platforms.filter(p => p.x > -p.w);
-        if (player.y > canvas.height) { lives--; livesEl.innerText = lives; if(lives<=0) die(); else {player.y=0; player.vy=0;} }
+        groundBlocks = groundBlocks.filter(b => b.x > -200);
+        if (player.y > canvas.height) { lives--; livesEl.innerText = lives; if(lives<=0) die(); else {player.y=0; player.vy=0; player.x=80;} }
         frameCount++;
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        platforms.forEach(p => {
-            ctx.fillStyle = p.e === '☁️' ? "white" : "#ffd54f";
-            if(p.e !== '☁️') {
-                ctx.fillRect(p.x, p.y, p.w, p.h);
-                ctx.strokeStyle = "#333"; ctx.lineWidth = 3; ctx.strokeRect(p.x, p.y, p.w, p.h);
-            } else {
-                ctx.font = "60px Arial"; ctx.fillText(p.e, p.x, p.y + 40);
+        // Dibujar Suelo
+        groundBlocks.forEach(b => {
+            if (!b.isHole) {
+                ctx.fillStyle = "#666"; ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.fillStyle = "#555"; ctx.fillRect(b.x, b.y, b.w, 5); // Línea superior calle
             }
         });
+        // Dibujar Items
         items.forEach(it => { ctx.font = it.size + "px Arial"; ctx.fillText(it.e, it.x, it.y + it.size); });
+        // Personaje
         ctx.font = player.h + "px Arial"; ctx.fillText(player.emoji, player.x, player.y + player.h);
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function startGame() {
-        scoreClocks = 0; scoreDonuts = 0; lives = 3; platforms = []; items = []; frameCount = 0;
+        scoreClocks = 0; scoreDonuts = 0; lives = 3; groundBlocks = []; items = []; frameCount = 0; totalHoles = 0;
         clocksEl.innerText = "0"; donutsEl.innerText = "0"; livesEl.innerText = "3";
         overlay.style.display = "none";
-        platforms.push({ x: 0, y: canvas.height-60, w: canvas.width + 200, h: 60 });
         isPlaying = true; draw();
     }
 
