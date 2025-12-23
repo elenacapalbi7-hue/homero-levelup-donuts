@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Runner: Variedad Extrema</title>
+    <title>Homer: El Cambio Total</title>
     <style>
         body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #4a90e2; overflow: hidden; }
-        #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 20px; pointer-events: none; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
-        .btn-action { padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-        #controls { position: absolute; bottom: 120px; width: 100%; display: flex; justify-content: center; z-index: 20; }
-        .jump-btn { width: 110px; height: 110px; background: rgba(255, 255, 255, 0.4); border: 5px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 50px; color: white; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #2c3e50; overflow: hidden; }
+        #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 20px; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
+        .btn-action { padding: 15px 40px; font-size: 22px; background: #f1c40f; border: none; border-radius: 10px; font-weight: bold; }
+        #controls { position: absolute; bottom: 100px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 20; }
+        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; color: white; }
     </style>
 </head>
 <body>
@@ -19,145 +19,155 @@
 <div id="game-container">
     <div id="ui">
         <div>⏰ <span id="clocks">0</span>/10</div>
-        <div>🍩 <span id="donuts">0</span></div>
         <div>❤️ <span id="lives">3</span></div>
     </div>
 
     <div id="overlay">
         <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Nuevos desafíos!<br>Esquiva la lluvia de objetos y usa el vuelo.</p>
-        <button class="btn-action" onclick="startGame()">¡JUGAR!</button>
+        <p id="msg">¡Mecánicas Cambiantes!<br>Usa las flechas y el salto.</p>
+        <button class="btn-action" onclick="startGame()">EMPEZAR</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
-    <div id="controls"><div class="jump-btn" id="btnJump">⬆️</div></div>
+
+    <div id="controls">
+        <div class="btn" id="left">⬅️</div>
+        <div class="btn" id="jump">⬆️</div>
+        <div class="btn" id="right">➡️</div>
+    </div>
 </div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const clocksEl = document.getElementById('clocks'), donutsEl = document.getElementById('donuts'), livesEl = document.getElementById('lives'), overlay = document.getElementById('overlay');
+    const clocksEl = document.getElementById('clocks'), livesEl = document.getElementById('lives'), overlay = document.getElementById('overlay');
 
-    let isPlaying = false, scoreClocks = 0, scoreDonuts = 0, lives = 3, frameCount = 0;
-    let platforms = [], items = [], gameSpeed = 6;
-    let gravityMode = 0.6; // Para cambiar en la zona de vuelo
+    let isPlaying = false, score = 0, lives = 3, frameCount = 0;
+    let mode = 'normal'; // normal, fly, climb
+    let platforms = [], items = [];
+    let keys = { left: false, right: false };
+    
+    // Configuración LENTA para niños
+    let gameSpeed = 3; 
 
-    const player = { x: 80, y: 0, w: 55, h: 75, vy: 0, gravity: 0.6, jumpPower: -13, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
+    const player = { x: 100, y: 0, w: 50, h: 70, vy: 0, gravity: 0.5, jumpPower: -12, jumps: 0, emoji: "🏃‍♂️" };
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
     resize();
 
-    function spawnModule() {
-        let x = canvas.width + 100;
-        let groundY = canvas.height - 60;
-        let type = Math.floor(Math.random() * 6);
+    function spawnEvent() {
+        let x = canvas.width + 50;
+        let groundY = canvas.height - 80;
+        
+        // Cambiar modo cada 15 segundos aproximadamente
+        if(frameCount % 800 === 0) {
+            const modes = ['normal', 'fly', 'climb'];
+            mode = modes[Math.floor(Math.random() * modes.length)];
+            player.emoji = mode === 'fly' ? "🚀" : (mode === 'climb' ? "🧗" : "🏃‍♂️");
+        }
 
-        switch(type) {
-            case 0: // 1. Ascensor de plataformas
-                platforms.push({x: x, y: groundY - 100, w: 100, h: 20, v: -2, limit: 100, c: '#FF5722'});
-                platforms.push({x: x + 150, y: groundY - 200, w: 100, h: 20, v: 2, limit: 250, c: '#FF5722'});
-                items.push({x: x + 175, y: groundY - 260, size: 45, t: 'clock', e: '⏰'});
-                break;
-            case 1: // 2. El Zig-Zag (Bajo/Alto)
-                items.push({x: x, y: groundY - 50, size: 50, t: 'bad', e: '📦'});
-                items.push({x: x + 150, y: groundY - 200, size: 60, t: 'bad', e: '🏢'});
-                items.push({x: x + 250, y: groundY - 40, size: 40, t: 'clock', e: '⏰'});
-                break;
-            case 2: // 3. Zona de Vuelo
-                player.gravity = 0.2; // Cambia gravedad
-                setTimeout(() => player.gravity = 0.6, 3000);
-                for(let i=0; i<6; i++) {
-                    items.push({x: x + (i*80), y: groundY - 250, size: 35, t: 'donut', e: '🍩'});
-                }
-                items.push({x: x + 500, y: groundY - 250, size: 45, t: 'clock', e: '⏰'});
-                break;
-            case 4: // 4. Salto de Fe
-                platforms.push({x: x, y: groundY - 250, w: 40, h: 250, c: '#333'}); // Muro alto
-                platforms.push({x: x + 150, y: groundY - 120, w: 150, h: 20, c: '#4CAF50'}); // Plataforma segura
-                items.push({x: x + 200, y: groundY - 170, size: 45, t: 'clock', e: '⏰'});
-                break;
-            case 5: // 5. Lluvia de Chatarra
-                for(let i=0; i<4; i++) {
-                    items.push({x: x + (i*120), y: -50, size: 45, t: 'bad', e: '💿', vy: 5});
-                }
-                items.push({x: x + 200, y: groundY - 40, size: 45, t: 'clock', e: '⏰'});
-                break;
-            case 3: // 6. Túnel de Velocidad
-                gameSpeed = 12;
-                setTimeout(() => gameSpeed = 6, 2000);
-                for(let i=0; i<8; i++) items.push({x: x + (i*100), y: groundY - 50, size: 35, t: 'donut', e: '🍩'});
-                break;
+        if(mode === 'normal') {
+            items.push({x: x, y: groundY - 50, size: 50, t: 'bad', e: '📦'});
+            items.push({x: x + 200, y: groundY - 150, size: 45, t: 'clock', e: '⏰'});
+        } else if(mode === 'fly') {
+            items.push({x: x, y: 100 + Math.random()*(canvas.height-300), size: 45, t: 'clock', e: '⏰'});
+            items.push({x: x + 100, y: Math.random()*canvas.height, size: 50, t: 'bad', e: '💿'});
+        } else if(mode === 'climb') {
+            platforms.push({x: Math.random()*(canvas.width-100), y: -50, w: 100, h: 20, vy: 2});
+            if(Math.random() < 0.3) items.push({x: Math.random()*canvas.width, y: -50, size: 45, t: 'clock', e: '⏰', vy: 2});
         }
     }
 
     function update() {
         if (!isPlaying) return;
-        player.vy += player.gravity; player.y += player.vy;
-        let groundY = canvas.height - 60;
 
-        if (player.y + player.h > groundY) {
-            player.y = groundY - player.h; player.vy = 0; player.jumps = 0;
+        // Movimiento lateral
+        if(keys.left && player.x > 0) player.x -= 5;
+        if(keys.right && player.x < canvas.width - player.w) player.x += 5;
+
+        // Física según modo
+        if(mode !== 'fly') {
+            player.vy += player.gravity;
+            player.y += player.vy;
+        } else {
+            player.y += player.vy;
+            player.vy *= 0.95; // Fricción aire
         }
 
-        platforms.forEach(p => {
-            p.x -= gameSpeed;
-            if(p.v) { // Movimiento vertical de plataforma
-                p.y += p.v;
-                if(p.y < 150 || p.y > groundY - 50) p.v *= -1;
-            }
-            if (player.x + player.w > p.x && player.x < p.x + p.w &&
-                player.y + player.h > p.y && player.y + player.h < p.y + player.vy + 12 && player.vy >= 0) {
+        // Suelo
+        let limitY = canvas.height - 80;
+        if(player.y + player.h > limitY && mode !== 'climb') {
+            player.y = limitY - player.h; player.vy = 0; player.jumps = 0;
+        }
+
+        // Plataformas y colisiones
+        platforms.forEach((p, i) => {
+            if(p.vy) p.y += p.vy; else p.x -= gameSpeed;
+            if(player.vy > 0 && player.x + player.w > p.x && player.x < p.x + p.w && player.y + player.h > p.y && player.y + player.h < p.y + 15) {
                 player.y = p.y - player.h; player.vy = 0; player.jumps = 0;
             }
         });
 
+        // Items
         for (let i = items.length - 1; i >= 0; i--) {
-            let it = items[i]; it.x -= gameSpeed;
-            if(it.vy) it.y += it.vy; // Si es lluvia de chatarra
+            let it = items[i];
+            it.x -= (it.vy ? 0 : gameSpeed);
+            if(it.vy) it.y += it.vy;
 
-            if (player.x < it.x + it.size - 10 && player.x + player.w > it.x + 10 &&
-                player.y < it.y + it.size - 10 && player.y + player.h > it.y + 10) {
-                
-                if (it.t === 'clock') { scoreClocks++; clocksEl.innerText = scoreClocks; if(scoreClocks>=10) win(); }
-                else if (it.t === 'donut') { scoreDonuts++; donutsEl.innerText = scoreDonuts; }
+            if (player.x < it.x + it.size && player.x + player.w > it.x && player.y < it.y + it.size && player.y + player.h > it.y) {
+                if (it.t === 'clock') { score++; clocksEl.innerText = score; if(score>=10) win(); }
                 else { lives--; livesEl.innerText = lives; if(lives<=0) die(); }
                 items.splice(i, 1); continue;
             }
-            if (it.x < -200 || it.y > canvas.height + 100) items.splice(i, 1);
+            if(it.x < -100 || it.y > canvas.height + 100) items.splice(i, 1);
         }
 
-        if (frameCount % 120 === 0) spawnModule();
-        platforms = platforms.filter(p => p.x > -p.w);
+        if(frameCount % 120 === 0) spawnEvent();
         frameCount++;
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#777"; ctx.fillRect(0, canvas.height-60, canvas.width, 60);
-        ctx.fillStyle = "#fff"; for(let i=0; i<10; i++) ctx.fillRect((i*150)-(frameCount*gameSpeed%150), canvas.height-35, 40, 5);
+        
+        // Fondo dinámico
+        ctx.fillStyle = mode === 'fly' ? "#1a252f" : "#2c3e50";
+        ctx.fillRect(0,0,canvas.width, canvas.height);
 
-        platforms.forEach(p => {
-            ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.w, p.h);
-            ctx.strokeStyle = "#000"; ctx.strokeRect(p.x, p.y, p.w, p.h);
-        });
+        // Suelo (solo en modo normal/fly)
+        if(mode !== 'climb') {
+            ctx.fillStyle = "#95a5a6"; ctx.fillRect(0, canvas.height-80, canvas.width, 80);
+        }
 
+        platforms.forEach(p => { ctx.fillStyle = "#ecf0f1"; ctx.fillRect(p.x, p.y, p.w, p.h); });
         items.forEach(it => { ctx.font = it.size + "px Arial"; ctx.fillText(it.e, it.x, it.y + it.size); });
         ctx.font = player.h + "px Arial"; ctx.fillText(player.emoji, player.x, player.y + player.h);
+
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function startGame() {
-        scoreClocks = 0; scoreDonuts = 0; lives = 3; platforms = []; items = []; frameCount = 0; gameSpeed = 6;
-        clocksEl.innerText = "0"; donutsEl.innerText = "0"; livesEl.innerText = "3";
+        score = 0; lives = 3; items = []; platforms = []; frameCount = 0; mode = 'normal';
+        clocksEl.innerText = "0"; livesEl.innerText = "3";
         overlay.style.display = "none"; isPlaying = true; draw();
     }
 
     function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
     function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡GANASTE!"; }
-    
-    const jump = () => { if (isPlaying && player.jumps < player.maxJumps) { player.vy = player.jumpPower; player.jumps++; } };
-    document.getElementById('btnJump').ontouchstart = (e) => { e.preventDefault(); jump(); };
+
+    // Controles
+    const setupBtn = (id, key) => {
+        const el = document.getElementById(id);
+        el.ontouchstart = (e) => { 
+            e.preventDefault(); 
+            if(id === 'jump') {
+                if(mode === 'fly') player.vy = -8;
+                else if(player.jumps < 2) { player.vy = player.jumpPower; player.jumps++; }
+            } else keys[key] = true;
+        };
+        el.ontouchend = () => keys[key] = false;
+    };
+    setupBtn('left', 'left'); setupBtn('right', 'right'); setupBtn('jump', 'jump');
 </script>
 </body>
 </html>
