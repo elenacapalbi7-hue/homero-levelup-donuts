@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer: El Cambio Total</title>
+    <title>Homer: 6 Mundos Locos</title>
     <style>
-        body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #2c3e50; overflow: hidden; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #1a1a1a; overflow: hidden; }
         #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 20px; }
+        #mode-tag { position: absolute; top: 60px; width: 100%; text-align: center; color: #FFD700; font-size: 24px; text-shadow: 2px 2px #000; z-index: 10; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
-        .btn-action { padding: 15px 40px; font-size: 22px; background: #f1c40f; border: none; border-radius: 10px; font-weight: bold; }
-        #controls { position: absolute; bottom: 100px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 20; }
-        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; color: white; }
+        .btn-action { padding: 15px 40px; font-size: 22px; background: #f1c40f; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        #controls { position: absolute; bottom: 80px; width: 100%; display: flex; justify-content: center; gap: 30px; z-index: 20; }
+        .btn { width: 90px; height: 90px; background: rgba(255,255,255,0.2); border: 4px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 40px; color: white; user-select: none; }
     </style>
 </head>
 <body>
@@ -21,153 +22,177 @@
         <div>⏰ <span id="clocks">0</span>/10</div>
         <div>❤️ <span id="lives">3</span></div>
     </div>
+    <div id="mode-tag">MODO: CARGANDO...</div>
 
     <div id="overlay">
-        <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Mecánicas Cambiantes!<br>Usa las flechas y el salto.</p>
-        <button class="btn-action" onclick="startGame()">EMPEZAR</button>
+        <h1 id="title">NIVEL 2: MULTI-MODO</h1>
+        <p id="msg">El juego cambiará cada vez que agarres un reloj.<br>¡Atento a las instrucciones!</p>
+        <button class="btn-action" onclick="startGame()">¡EMPEZAR!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <div id="controls">
-        <div class="btn" id="left">⬅️</div>
-        <div class="btn" id="jump">⬆️</div>
-        <div class="btn" id="right">➡️</div>
+        <div class="btn" id="btn1">⬅️</div>
+        <div class="btn" id="btn2">🔘</div>
+        <div class="btn" id="btn3">➡️</div>
     </div>
 </div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const clocksEl = document.getElementById('clocks'), livesEl = document.getElementById('lives'), overlay = document.getElementById('overlay');
+    const clocksEl = document.getElementById('clocks'), livesEl = document.getElementById('lives'), modeTag = document.getElementById('mode-tag'), overlay = document.getElementById('overlay');
 
     let isPlaying = false, score = 0, lives = 3, frameCount = 0;
-    let mode = 'normal'; // normal, fly, climb
-    let platforms = [], items = [];
-    let keys = { left: false, right: false };
-    
-    // Configuración LENTA para niños
-    let gameSpeed = 3; 
+    let currentMode = 0; // 0 a 5
+    const modes = [
+        { name: "EL PÉNDULO", msg: "Toca el botón central para soltarte" },
+        { name: "GRAVEDAD INVERTIDA", msg: "Botón central cambia suelo/techo" },
+        { name: "NADO EN CERVEZA", msg: "Usa flechas para nadar" },
+        { name: "ESCUDO DE DONAS", msg: "Flechas giran el escudo" },
+        { name: "RAYO REDUCTOR", msg: "Flechas: Gigante o Enano" },
+        { name: "HOMERO ESPEJO", msg: "¡Cuidado con ambos!" }
+    ];
 
-    const player = { x: 100, y: 0, w: 50, h: 70, vy: 0, gravity: 0.5, jumpPower: -12, jumps: 0, emoji: "🏃‍♂️" };
+    let items = [], obstacles = [];
+    let player = { x: 0, y: 0, w: 60, h: 80, vy: 0, vx: 0, gravity: 0.5, size: 1, angle: 0 };
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
     resize();
 
-    function spawnEvent() {
-        let x = canvas.width + 50;
-        let groundY = canvas.height - 80;
+    function initMode() {
+        items = []; obstacles = [];
+        player.vx = 0; player.vy = 0; player.angle = 0; player.size = 1;
+        modeTag.innerText = modes[currentMode].name;
         
-        // Cambiar modo cada 15 segundos aproximadamente
-        if(frameCount % 800 === 0) {
-            const modes = ['normal', 'fly', 'climb'];
-            mode = modes[Math.floor(Math.random() * modes.length)];
-            player.emoji = mode === 'fly' ? "🚀" : (mode === 'climb' ? "🧗" : "🏃‍♂️");
+        if(currentMode === 0) { // Péndulo
+            player.x = 50; player.y = 50;
+        } else if(currentMode === 1) { // Gravedad
+            player.x = 100; player.y = canvas.height - 150; player.gravity = 0.6;
+        } else {
+            player.x = canvas.width/2; player.y = canvas.height/2;
         }
+    }
 
-        if(mode === 'normal') {
-            items.push({x: x, y: groundY - 50, size: 50, t: 'bad', e: '📦'});
-            items.push({x: x + 200, y: groundY - 150, size: 45, t: 'clock', e: '⏰'});
-        } else if(mode === 'fly') {
-            items.push({x: x, y: 100 + Math.random()*(canvas.height-300), size: 45, t: 'clock', e: '⏰'});
-            items.push({x: x + 100, y: Math.random()*canvas.height, size: 50, t: 'bad', e: '💿'});
-        } else if(mode === 'climb') {
-            platforms.push({x: Math.random()*(canvas.width-100), y: -50, w: 100, h: 20, vy: 2});
-            if(Math.random() < 0.3) items.push({x: Math.random()*canvas.width, y: -50, size: 45, t: 'clock', e: '⏰', vy: 2});
-        }
+    function spawn() {
+        if (frameCount % 120 !== 0) return;
+        let x = canvas.width + 50;
+        
+        // Reloj de meta
+        if(items.length === 0) items.push({x: canvas.width - 100, y: canvas.height/2, size: 50, e: '⏰'});
+
+        // Obstáculos según modo
+        if(currentMode === 1) obstacles.push({x, y: Math.random() > 0.5 ? 0 : canvas.height-100, w: 50, h: 100, e: '🚧'});
+        if(currentMode === 2) obstacles.push({x, y: Math.random()*canvas.height, w: 50, h: 50, e: '💣'});
+        if(currentMode === 3) obstacles.push({x, y: Math.random()*canvas.height, w: 40, h: 40, e: '📦', vx: -4});
     }
 
     function update() {
         if (!isPlaying) return;
+        frameCount++;
+        spawn();
 
-        // Movimiento lateral
-        if(keys.left && player.x > 0) player.x -= 5;
-        if(keys.right && player.x < canvas.width - player.w) player.x += 5;
-
-        // Física según modo
-        if(mode !== 'fly') {
-            player.vy += player.gravity;
-            player.y += player.vy;
-        } else {
-            player.y += player.vy;
-            player.vy *= 0.95; // Fricción aire
+        switch(currentMode) {
+            case 0: // Péndulo
+                player.angle += 0.05;
+                player.x = 150 + Math.cos(player.angle) * 100;
+                player.y = 100 + Math.sin(player.angle) * 100;
+                break;
+            case 1: // Gravedad
+                player.vy += player.gravity;
+                player.y += player.vy;
+                if(player.y < 0) { player.y = 0; player.vy = 0; }
+                if(player.y > canvas.height - 80) { player.y = canvas.height - 80; player.vy = 0; }
+                obstacles.forEach(o => o.x -= 4);
+                break;
+            case 2: // Nado
+                player.x += player.vx; player.y += player.vy;
+                obstacles.forEach(o => o.x -= 3);
+                break;
+            case 3: // Escudo
+                player.angle += player.vx * 0.1;
+                obstacles.forEach(o => o.x += o.vx);
+                break;
         }
 
-        // Suelo
-        let limitY = canvas.height - 80;
-        if(player.y + player.h > limitY && mode !== 'climb') {
-            player.y = limitY - player.h; player.vy = 0; player.jumps = 0;
-        }
-
-        // Plataformas y colisiones
-        platforms.forEach((p, i) => {
-            if(p.vy) p.y += p.vy; else p.x -= gameSpeed;
-            if(player.vy > 0 && player.x + player.w > p.x && player.x < p.x + p.w && player.y + player.h > p.y && player.y + player.h < p.y + 15) {
-                player.y = p.y - player.h; player.vy = 0; player.jumps = 0;
+        // Colisión con Reloj (Cambio de Modo)
+        items.forEach((it, i) => {
+            if(Math.hypot(player.x - it.x, player.y - it.y) < 60) {
+                score++;
+                clocksEl.innerText = score;
+                items.splice(i, 1);
+                if(score >= 10) win();
+                else {
+                    currentMode = (currentMode + 1) % 6;
+                    initMode();
+                }
             }
         });
 
-        // Items
-        for (let i = items.length - 1; i >= 0; i--) {
-            let it = items[i];
-            it.x -= (it.vy ? 0 : gameSpeed);
-            if(it.vy) it.y += it.vy;
-
-            if (player.x < it.x + it.size && player.x + player.w > it.x && player.y < it.y + it.size && player.y + player.h > it.y) {
-                if (it.t === 'clock') { score++; clocksEl.innerText = score; if(score>=10) win(); }
-                else { lives--; livesEl.innerText = lives; if(lives<=0) die(); }
-                items.splice(i, 1); continue;
+        // Colisión con Obstáculos
+        obstacles.forEach((o, i) => {
+            if(Math.hypot(player.x - o.x, player.y - o.y) < 50) {
+                lives--;
+                livesEl.innerText = lives;
+                obstacles.splice(i, 1);
+                if(lives <= 0) die();
             }
-            if(it.x < -100 || it.y > canvas.height + 100) items.splice(i, 1);
-        }
-
-        if(frameCount % 120 === 0) spawnEvent();
-        frameCount++;
+        });
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Fondo dinámico
-        ctx.fillStyle = mode === 'fly' ? "#1a252f" : "#2c3e50";
+        // Dibujar Fondo según modo
+        ctx.fillStyle = ["#1a1a1a", "#2c3e50", "#f39c12", "#c0392b", "#27ae60", "#8e44ad"][currentMode];
         ctx.fillRect(0,0,canvas.width, canvas.height);
 
-        // Suelo (solo en modo normal/fly)
-        if(mode !== 'climb') {
-            ctx.fillStyle = "#95a5a6"; ctx.fillRect(0, canvas.height-80, canvas.width, 80);
+        // Jugador
+        ctx.font = (80 * player.size) + "px Arial";
+        ctx.fillText("🏃‍♂️", player.x, player.y);
+
+        // Escudo en modo 3
+        if(currentMode === 3) {
+            ctx.font = "40px Arial";
+            let dx = player.x + Math.cos(player.angle) * 80;
+            let dy = player.y + Math.sin(player.angle) * 80;
+            ctx.fillText("🍩", dx, dy);
         }
 
-        platforms.forEach(p => { ctx.fillStyle = "#ecf0f1"; ctx.fillRect(p.x, p.y, p.w, p.h); });
-        items.forEach(it => { ctx.font = it.size + "px Arial"; ctx.fillText(it.e, it.x, it.y + it.size); });
-        ctx.font = player.h + "px Arial"; ctx.fillText(player.emoji, player.x, player.y + player.h);
+        items.forEach(it => { ctx.font = "50px Arial"; ctx.fillText(it.e, it.x, it.y); });
+        obstacles.forEach(o => { ctx.font = "50px Arial"; ctx.fillText(o.e, o.x, o.y); });
 
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function startGame() {
-        score = 0; lives = 3; items = []; platforms = []; frameCount = 0; mode = 'normal';
+        score = 0; lives = 3; currentMode = 0; frameCount = 0;
         clocksEl.innerText = "0"; livesEl.innerText = "3";
-        overlay.style.display = "none"; isPlaying = true; draw();
+        overlay.style.display = "none";
+        initMode();
+        isPlaying = true;
+        draw();
     }
 
     function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
     function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡GANASTE!"; }
 
-    // Controles
-    const setupBtn = (id, key) => {
-        const el = document.getElementById(id);
-        el.ontouchstart = (e) => { 
-            e.preventDefault(); 
-            if(id === 'jump') {
-                if(mode === 'fly') player.vy = -8;
-                else if(player.jumps < 2) { player.vy = player.jumpPower; player.jumps++; }
-            } else keys[key] = true;
-        };
-        el.ontouchend = () => keys[key] = false;
+    // CONTROLES MULTI-FUNCIÓN
+    const b1 = document.getElementById('btn1'), b2 = document.getElementById('btn2'), b3 = document.getElementById('btn3');
+    
+    b1.ontouchstart = () => { if(currentMode === 2) player.vx = -5; if(currentMode === 3) player.vx = -1; if(currentMode === 4) player.size = 0.5; };
+    b1.ontouchend = () => { player.vx = 0; };
+    
+    b3.ontouchstart = () => { if(currentMode === 2) player.vx = 5; if(currentMode === 3) player.vx = 1; if(currentMode === 4) player.size = 2; };
+    b3.ontouchend = () => { player.vx = 0; };
+
+    b2.ontouchstart = () => {
+        if(currentMode === 1) player.gravity *= -1; // Invertir gravedad
+        if(currentMode === 2) player.vy = -5; // Nadar arriba
     };
-    setupBtn('left', 'left'); setupBtn('right', 'right'); setupBtn('jump', 'jump');
+    b2.ontouchend = () => { if(currentMode === 2) player.vy = 2; };
 </script>
 </body>
 </html>
