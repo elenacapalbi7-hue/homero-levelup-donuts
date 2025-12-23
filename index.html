@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Runner: Calle Springfield</title>
+    <title>Homer Runner: Springfield Adventure</title>
     <style>
-        body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #87CEEB; overflow: hidden; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; overflow: hidden; }
         #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 20px; pointer-events: none; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
         .btn-action { padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #b8860b; }
         #controls { position: absolute; bottom: 120px; width: 100%; display: flex; justify-content: center; z-index: 20; }
-        .jump-btn { width: 110px; height: 110px; background: rgba(255, 255, 255, 0.3); border: 5px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 50px; color: white; }
+        .jump-btn { width: 110px; height: 110px; background: rgba(255, 255, 255, 0.4); border: 5px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 50px; color: white; }
     </style>
 </head>
 <body>
@@ -25,7 +25,7 @@
 
     <div id="overlay">
         <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Corre por la ciudad!<br>Esquiva los obstáculos urbanos.</p>
+        <p id="msg">¡Supera los retos de Springfield!<br>Usa el doble salto en las plataformas.</p>
         <button class="btn-action" onclick="startGame()">¡JUGAR!</button>
     </div>
 
@@ -39,51 +39,52 @@
     const clocksEl = document.getElementById('clocks'), donutsEl = document.getElementById('donuts'), livesEl = document.getElementById('lives'), overlay = document.getElementById('overlay');
 
     let isPlaying = false, scoreClocks = 0, scoreDonuts = 0, lives = 3, frameCount = 0;
-    let groundBlocks = [], items = [], gameSpeed = 5;
-    let totalHoles = 0; // Para limitar a solo 3 en todo el juego
+    let platforms = [], items = [], gameSpeed = 5;
 
-    const player = { x: 80, y: 0, w: 60, h: 80, vy: 0, gravity: 0.6, jumpPower: -13, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
+    const player = { x: 80, y: 0, w: 55, h: 75, vy: 0, gravity: 0.6, jumpPower: -13, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
     resize();
 
-    // Sistema de suelo sólido con muy pocos huecos
-    function updateGround() {
-        if (groundBlocks.length === 0 || groundBlocks[groundBlocks.length - 1].x < canvas.width) {
-            let x = groundBlocks.length === 0 ? 0 : groundBlocks[groundBlocks.length - 1].x + 100;
-            let isHole = false;
+    function spawnModule() {
+        let x = canvas.width + 100;
+        let groundY = canvas.height - 60;
+        let type = Math.floor(Math.random() * 6);
 
-            // Solo permite un hueco si no se ha llegado al límite de 3 y por puro azar raro
-            if (totalHoles < 3 && frameCount > 500 && Math.random() < 0.02) {
-                isHole = true;
-                totalHoles++;
-            }
-
-            groundBlocks.push({ x: x, y: canvas.height - 60, w: 105, h: 60, isHole: isHole });
-            
-            // Si NO es un hueco, hay chance de poner un obstáculo DIFERENTE encima
-            if (!isHole && Math.random() < 0.15) {
-                spawnRandomObstacle(x);
-            }
+        switch(type) {
+            case 0: // 1. Escalera de Bloques
+                for(let i=0; i<3; i++) {
+                    platforms.push({x: x+(i*100), y: groundY-(i*60), w: 80, h: 30, c: '#8d6e63'});
+                }
+                items.push({x: x+215, y: groundY-180, size: 45, t: 'clock', e: '⏰'});
+                break;
+            case 1: // 2. El Túnel
+                items.push({x: x, y: groundY-50, size: 50, t: 'bad', e: '🚧'});
+                platforms.push({x: x-10, y: groundY-180, w: 100, h: 20, c: '#546e7a'});
+                items.push({x: x+120, y: groundY-40, size: 40, t: 'clock', e: '⏰'});
+                break;
+            case 2: // 3. Parábola de Donas
+                for(let i=0; i<5; i++) {
+                    let dy = Math.sin(i * 0.8) * 80;
+                    items.push({x: x+(i*60), y: groundY-150+dy, size: 35, t: 'donut', e: '🍩'});
+                }
+                break;
+            case 3: // 4. Doble Salto Obligatorio (Muro Alto)
+                items.push({x: x, y: groundY-80, size: 80, t: 'bad', e: '🏢'});
+                items.push({x: x+20, y: groundY-180, size: 45, t: 'clock', e: '⏰'});
+                break;
+            case 4: // 5. Plataformas Escalonadas
+                platforms.push({x: x, y: groundY-120, w: 250, h: 20, c: '#ffd54f'});
+                items.push({x: x+50, y: groundY-170, size: 40, t: 'donut', e: '🍩'});
+                items.push({x: x+150, y: groundY-170, size: 45, t: 'clock', e: '⏰'});
+                items.push({x: x+100, y: groundY-50, size: 50, t: 'bad', e: '🚗'});
+                break;
+            case 5: // 6. El Trampolín
+                items.push({x: x, y: groundY-30, size: 50, t: 'spring', e: '🔋'});
+                items.push({x: x+50, y: groundY-280, size: 50, t: 'clock', e: '⏰'});
+                break;
         }
-    }
-
-    function spawnRandomObstacle(x) {
-        const obs = [
-            {e: '🚗', t: 'bad', s: 60}, // Auto
-            {e: '🚧', t: 'bad', s: 50}, // Valla
-            {e: '🗑️', t: 'bad', s: 45}, // Basura
-            {e: '💧', t: 'bad', s: 40}, // Hidrante
-            {e: '📦', t: 'bad', s: 45}, // Caja
-            {e: '🚲', t: 'bad', s: 50}, // Bici
-            {e: '⏰', t: 'clock', s: 45}, // Reloj
-            {e: '🍩', t: 'donut', s: 40}  // Dona
-        ];
-        let chosen = obs[Math.floor(Math.random() * obs.length)];
-        // Los premios a veces van altos para usar el doble salto
-        let yPos = (chosen.t !== 'bad' && Math.random() > 0.5) ? canvas.height - 180 : canvas.height - 105;
-        items.push({ x: x, y: yPos, size: chosen.s, t: chosen.t, e: chosen.e });
     }
 
     function update() {
@@ -91,53 +92,69 @@
         player.vy += player.gravity; player.y += player.vy;
         let onGround = false;
 
-        updateGround();
-        groundBlocks.forEach(b => {
-            b.x -= gameSpeed;
-            if (!b.isHole && player.x + player.w > b.x && player.x < b.x + b.w &&
-                player.y + player.h > b.y && player.y + player.h < b.y + player.vy + 10 && player.vy >= 0) {
-                player.y = b.y - player.h; player.vy = 0; player.jumps = 0; onGround = true;
+        // Suelo fijo
+        let baseGround = canvas.height - 60;
+        if (player.y + player.h > baseGround) {
+            player.y = baseGround - player.h; player.vy = 0; player.jumps = 0; onGround = true;
+        }
+
+        // Plataformas
+        platforms.forEach(p => {
+            p.x -= gameSpeed;
+            if (player.x + player.w > p.x && player.x < p.x + p.w &&
+                player.y + player.h > p.y && player.y + player.h < p.y + player.vy + 12 && player.vy >= 0) {
+                player.y = p.y - player.h; player.vy = 0; player.jumps = 0; onGround = true;
             }
         });
 
+        // Items y Mecánicas
         for (let i = items.length - 1; i >= 0; i--) {
             let it = items[i]; it.x -= gameSpeed;
             if (player.x < it.x + it.size - 10 && player.x + player.w > it.x + 10 &&
                 player.y < it.y + it.size - 10 && player.y + player.h > it.y + 10) {
+                
                 if (it.t === 'clock') { scoreClocks++; clocksEl.innerText = scoreClocks; if(scoreClocks>=10) win(); }
                 else if (it.t === 'donut') { scoreDonuts++; donutsEl.innerText = scoreDonuts; }
+                else if (it.t === 'spring') { player.vy = -22; player.jumps = 1; } // Mecánica trampolín
                 else { lives--; livesEl.innerText = lives; if(lives<=0) die(); }
-                items.splice(i, 1); continue;
+                
+                if (it.t !== 'spring') items.splice(i, 1);
+                continue;
             }
-            if (it.x < -100) items.splice(i, 1);
+            if (it.x < -200) items.splice(i, 1);
         }
 
-        groundBlocks = groundBlocks.filter(b => b.x > -200);
-        if (player.y > canvas.height) { lives--; livesEl.innerText = lives; if(lives<=0) die(); else {player.y=0; player.vy=0; player.x=80;} }
+        if (frameCount % 100 === 0) spawnModule();
+        platforms = platforms.filter(p => p.x > -p.w);
         frameCount++;
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Dibujar Suelo
-        groundBlocks.forEach(b => {
-            if (!b.isHole) {
-                ctx.fillStyle = "#666"; ctx.fillRect(b.x, b.y, b.w, b.h);
-                ctx.fillStyle = "#555"; ctx.fillRect(b.x, b.y, b.w, 5); // Línea superior calle
-            }
+        
+        // Suelo
+        ctx.fillStyle = "#777"; ctx.fillRect(0, canvas.height-60, canvas.width, 60);
+        ctx.fillStyle = "#fff"; for(let i=0; i<10; i++) ctx.fillRect((i*150)-(frameCount*gameSpeed%150), canvas.height-35, 40, 5);
+
+        // Plataformas
+        platforms.forEach(p => {
+            ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.strokeStyle = "#000"; ctx.strokeRect(p.x, p.y, p.w, p.h);
         });
-        // Dibujar Items
+
+        // Items
         items.forEach(it => { ctx.font = it.size + "px Arial"; ctx.fillText(it.e, it.x, it.y + it.size); });
-        // Personaje
+        
+        // Homero
         ctx.font = player.h + "px Arial"; ctx.fillText(player.emoji, player.x, player.y + player.h);
+        
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function startGame() {
-        scoreClocks = 0; scoreDonuts = 0; lives = 3; groundBlocks = []; items = []; frameCount = 0; totalHoles = 0;
+        scoreClocks = 0; scoreDonuts = 0; lives = 3; platforms = []; items = []; frameCount = 0;
         clocksEl.innerText = "0"; donutsEl.innerText = "0"; livesEl.innerText = "3";
-        overlay.style.display = "none";
-        isPlaying = true; draw();
+        overlay.style.display = "none"; isPlaying = true; draw();
     }
 
     function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
