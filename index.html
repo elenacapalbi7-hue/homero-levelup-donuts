@@ -3,23 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Adventure FIX</title>
+    <title>Homer's World: Ultimate Edition</title>
     <style>
-        body { margin: 0; background: #5c94fc; overflow: hidden; touch-action: none; font-family: sans-serif; }
-        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; pointer-events: none; z-index: 10; font-weight: bold; }
-        #controls { position: absolute; bottom: 50px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 20; }
-        .btn { width: 70px; height: 70px; background: rgba(0,0,0,0.5); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; pointer-events: auto; user-select: none; }
+        body { margin: 0; background: #5c94fc; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
+        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 1rem; }
+        #controls { position: absolute; bottom: 40px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
+        .btn { width: 75px; height: 75px; background: rgba(0,0,0,0.4); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; user-select: none; }
+        #canvas { display: block; width: 100vw; height: 100vh; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div>🍩 x <span id="donas">0</span></div>
-    <div>❤️ x <span id="vidas">3</span></div>
+    <div>DONAS: <span id="donas">0</span></div>
+    <div>VIDAS: <span id="vidas">3</span></div>
+    <div id="power" style="color: #ffeb3b;"></div>
 </div>
 
 <div id="controls">
-    <div style="display:flex; gap:15px;">
+    <div style="display:flex; gap:20px;">
         <div class="btn" id="left">⬅️</div>
         <div class="btn" id="right">➡️</div>
     </div>
@@ -33,83 +35,134 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
 let countDonas = 0, countVidas = 3, camX = 0;
-let blocks = [], enemies = [], items = [], fx = [];
+let world = [], enemies = [], items = [], coins = [], particles = [];
 let keys = { left: false, right: false };
 
 const player = {
-    x: 100, y: 0, w: 40, h: 80, vx: 0, vy: 0,
-    isSuper: false, timerSuper: 0, onGround: false, saltos: 0
+    x: 100, y: 0, w: 40, h: 75, vx: 0, vy: 0,
+    isSuper: false, timerSuper: 0, onGround: false, dir: 1
 };
 
-function buildLevel() {
-    blocks = []; enemies = []; items = []; fx = [];
+function init() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    player.y = canvas.height - 200;
+    createWorld();
+    requestAnimationFrame(loop);
+}
+
+function createWorld() {
+    world = []; enemies = []; items = []; coins = [];
     const floorY = canvas.height - 80;
 
-    for(let i=0; i<500; i++) {
-        // Suelo con huecos
-        if (!(i > 40 && i < 44) && !(i > 100 && i < 105) && !(i > 180 && i < 186)) {
-            blocks.push({x: i*40, y: floorY, t:'S'});
-            blocks.push({x: i*40, y: floorY + 40, t:'S'});
+    // Generador de nivel variado (no repetitivo)
+    for(let i=0; i<800; i++) {
+        let x = i * 40;
+        
+        // Suelo con abismos
+        if (!(i > 50 && i < 54) && !(i > 120 && i < 125) && !(i > 220 && i < 226)) {
+            world.push({x, y: floorY, t: 'G'}); 
         }
 
-        // Tuberías / Plantas Nucleares
-        if(i === 25 || i === 70 || i === 130) {
-            blocks.push({x: i*40, y: floorY - 40, t:'P'});
-            blocks.push({x: i*40, y: floorY - 80, t:'P'});
-            enemies.push({x: i*40 + 5, y: floorY - 120, vx: -2});
+        // Donas sueltas por el aire
+        if (i % 15 === 0) coins.push({x: x + 10, y: floorY - 120, collect: false});
+
+        // Tuberías Sólidas (Plantas Nucleares)
+        if (i === 35 || i === 90 || i === 180) {
+            world.push({x, y: floorY - 40, t: 'P'});
+            world.push({x, y: floorY - 80, t: 'P'});
+            enemies.push({x: x + 5, y: floorY - 120, vx: -2.5, w: 40, h: 40}); // Flanders grande
         }
 
-        // Bloques aéreos y Sorpresas
-        if(i % 30 === 0 && i > 10) {
-            for(let j=0; j<5; j++) {
-                let tipo = (j === 2) ? '?' : 'B';
-                let item = (i === 30 && j === 2) ? 'Duff' : (i === 90 && j === 2 ? 'Star' : 'Dona');
-                blocks.push({x: (i+j)*40, y: floorY - 160, t: tipo, item: item, hits: 5});
-            }
+        // Estructuras de bloques como en Mario
+        if (i === 20) {
+            addBlockRow(x, floorY - 160, [
+                {t:'B'}, {t:'?' , it:'beer'}, {t:'B'}, {t:'⭐', hits:5}, {t:'B'}
+            ]);
+        }
+        
+        if (i === 110) {
+            addBlockRow(x, floorY - 160, [{t:'B'}, {t:'B'}, {t:'B'}]);
+            addBlockRow(x + 40, floorY - 280, [{t:'?' , it:'beer'}]);
         }
     }
 }
 
+function addBlockRow(x, y, pattern) {
+    pattern.forEach((p, idx) => {
+        world.push({x: x + (idx * 40), y, t: p.t, it: p.it, hits: p.hits || 1});
+    });
+}
+
 function update() {
-    if (keys.left) player.vx = -6;
-    else if (keys.right) player.vx = 6;
+    // Física
+    if (keys.left) { player.vx = -7; player.dir = -1; }
+    else if (keys.right) { player.vx = 7; player.dir = 1; }
     else player.vx *= 0.8;
 
-    player.vy += 0.8;
+    player.vy += 0.9;
     player.x += player.vx;
     player.y += player.vy;
 
-    camX = player.x - 100;
+    camX = player.x - canvas.width / 4;
 
     if (player.timerSuper > 0) {
         player.timerSuper--;
-        if (player.timerSuper === 0) player.isSuper = false;
+        player.isSuper = true;
+        document.getElementById('power').innerText = "💪 MODO ROMPEDOR: " + Math.ceil(player.timerSuper/60) + "s";
+    } else {
+        player.isSuper = false;
+        document.getElementById('power').innerText = "";
     }
 
+    // Colisiones con Mundo
     player.onGround = false;
-    blocks.forEach((b, idx) => {
+    world.forEach((b, idx) => {
         if (player.x + player.w > b.x && player.x < b.x + 40 && player.y + player.h > b.y && player.y < b.y + 40) {
+            // Piso (Pisar suelo o tubería)
             if (player.vy > 0 && player.y + player.h - player.vy <= b.y) {
-                player.y = b.y - player.h; player.vy = 0; player.onGround = true; player.saltos = 0;
-            } else if (player.vy < 0 && player.y - player.vy >= b.y + 40) {
+                player.y = b.y - player.h; player.vy = 0; player.onGround = true;
+            }
+            // Paredes (Tuberías)
+            else if (player.vx > 0 && b.t === 'P' && player.x + player.w - player.vx <= b.x) {
+                player.x = b.x - player.w;
+            }
+            else if (player.vx < 0 && b.t === 'P' && player.x - player.vx >= b.x + 40) {
+                player.x = b.x + 40;
+            }
+            // Techo (Golpear bloques)
+            else if (player.vy < 0 && player.y - player.vy >= b.y + 40) {
                 player.y = b.y + 40; player.vy = 2;
-                hitBlock(b, idx);
+                handleHit(b, idx);
             }
         }
     });
 
-    enemies.forEach((en, idx) => {
-        en.x += en.vx;
-        if (Math.abs(player.x - en.x) < 30 && Math.abs(player.y - en.y) < 50) {
-            if (player.vy > 0) { enemies.splice(idx, 1); player.vy = -10; }
-            else if (!player.isSuper) { die(); }
+    // Donas sueltas
+    coins.forEach(c => {
+        if(!c.collect && Math.hypot(player.x - c.x, player.y - c.y) < 40) {
+            c.collect = true; countDonas++;
         }
     });
 
+    // Enemigos Flanders
+    enemies.forEach((en, idx) => {
+        en.x += en.vx;
+        // Rebote en tuberías
+        if (world.some(b => b.t === 'P' && en.x < b.x + 40 && en.x + en.w > b.x && en.y + en.h > b.y)) en.vx *= -1;
+
+        if (player.x < en.x + en.w && player.x + player.w > en.x && player.y < en.y + en.h && player.y + player.h > en.y) {
+            if (player.vy > 0) { // Pisar
+                enemies.splice(idx, 1); player.vy = -12;
+            } else if (!player.isSuper) { die(); }
+        }
+    });
+
+    // Items
     items.forEach((it, idx) => {
-        it.y += 3;
-        if (Math.abs(player.x - it.x) < 40 && Math.abs(player.y - it.y) < 80) {
-            if(it.t === '🍺') { player.isSuper = true; player.timerSuper = 600; }
+        it.y += 4;
+        if (Math.hypot(player.x - it.x, player.y - it.y) < 50) {
+            if(it.t === '🍺') { player.timerSuper = 600; }
             items.splice(idx, 1);
         }
     });
@@ -117,30 +170,31 @@ function update() {
     if (player.y > canvas.height) die();
 }
 
-function hitBlock(b, idx) {
-    if (b.t === '?' || b.t === 'B') {
-        if (b.item === 'Duff') {
+function handleHit(b, idx) {
+    if (b.t === '?' || b.t === '⭐') {
+        if (b.it === 'beer') {
             items.push({x: b.x, y: b.y - 40, t: '🍺'});
-            b.item = null; b.t = 'U';
-        } else if (b.item === 'Star') {
-            spawnFX(b.x, b.y - 40, '🍩');
-            countDonas++; b.hits--;
-            if(b.hits <= 0) { b.t = 'U'; b.item = null; }
-        } else if (b.item === 'Dona') {
-            spawnFX(b.x, b.y - 40, '🍩');
-            countDonas++; b.t = 'U'; b.item = null;
-        } else if (b.t === 'B' && player.isSuper) {
-            blocks.splice(idx, 1);
+            b.t = 'U';
+        } else {
+            countDonas++;
+            spawnParticle(b.x + 10, b.y - 20, '🍩');
+            if (b.t === '⭐' && b.hits > 1) b.hits--;
+            else b.t = 'U';
         }
+    } else if (b.t === 'B' && player.isSuper) {
+        world.splice(idx, 1);
+        spawnParticle(b.x, b.y, '💥');
     }
 }
 
-function spawnFX(x, y, char) { fx.push({x, y, char, vy: -5, life: 20}); }
+function spawnParticle(x, y, char) {
+    particles.push({x, y, char, vy: -6, life: 25});
+}
 
 function die() {
     countVidas--;
     player.x = 100; player.y = 0;
-    if(countVidas <= 0) { countVidas = 3; countDonas = 0; buildLevel(); }
+    if (countVidas <= 0) { countVidas = 3; countDonas = 0; createWorld(); }
 }
 
 function draw() {
@@ -148,42 +202,55 @@ function draw() {
     ctx.save();
     ctx.translate(-camX, 0);
 
-    blocks.forEach(b => {
-        ctx.fillStyle = b.t === 'S' ? '#944828' : b.t === 'B' ? '#e76e33' : b.t === '?' ? '#f1c40f' : b.t === 'P' ? '#27ae60' : '#7f8c8d';
-        ctx.fillRect(b.x, b.y, 39, 39);
-        if(b.t === '?') { ctx.fillStyle='white'; ctx.fillText("?", b.x+15, b.y+25); }
+    // Dibujar Mundo
+    world.forEach(b => {
+        if (b.t === 'G') ctx.fillStyle = '#944828';
+        else if (b.t === 'P') ctx.fillStyle = '#27ae60'; // Verde Tubería
+        else if (b.t === 'B') ctx.fillStyle = '#e76e33'; // Ladrillo
+        else if (b.t === '?' || b.t === '⭐') ctx.fillStyle = '#f1c40f';
+        else ctx.fillStyle = '#7f8c8d';
+
+        ctx.fillRect(b.x, b.y, 40, 40);
+        ctx.strokeStyle = 'black'; ctx.strokeRect(b.x, b.y, 40, 40);
+        if (b.t === '?' || b.t === '⭐') {
+            ctx.fillStyle = 'white'; ctx.font = "20px Arial";
+            ctx.fillText(b.t === '⭐' ? '⭐' : '?', b.x + 12, b.y + 28);
+        }
     });
 
-    enemies.forEach(en => ctx.fillText("👨‍🏫", en.x, en.y + 35));
-    fx.forEach((f, i) => { f.y += f.vy; f.life--; ctx.fillText(f.char, f.x+10, f.y); if(f.life<0) fx.splice(i,1); });
-    items.forEach(it => ctx.fillText(it.t, it.x, it.y+20));
+    // Donas y Enemigos
+    coins.forEach(c => { if(!c.collect) ctx.fillText("🍩", c.x, c.y); });
+    enemies.forEach(en => { ctx.font = "45px Arial"; ctx.fillText("👨‍🏫", en.x, en.y + 40); });
+    items.forEach(it => { ctx.font = "40px Arial"; ctx.fillText(it.t, it.x, it.y); });
+    particles.forEach((p, i) => { p.y += p.vy; p.life--; ctx.fillText(p.char, p.x, p.y); if(p.life < 0) particles.splice(i, 1); });
 
-    // HOMERO CUERPO COMPLETO SIN FLOTAR
-    let size = player.isSuper ? 1.5 : 1;
-    ctx.font = (40 * size) + "px Arial";
-    ctx.fillText("👨‍🦲", player.x, player.y + (35 * size));
-    ctx.fillText("👕", player.x + (2 * size), player.y + (60 * size));
-    ctx.fillText("👖", player.x + (2 * size), player.y + (85 * size));
+    // HOMERO
+    let s = player.isSuper ? 1.5 : 1;
+    ctx.font = (45 * s) + "px Arial";
+    ctx.fillText("👨‍🦲", player.x, player.y + (40 * s));
+    ctx.font = (35 * s) + "px Arial";
+    ctx.fillText("👕", player.x + (2 * s), player.y + (65 * s));
+    ctx.fillText("👖", player.x + (2 * s), player.y + (90 * s));
 
-    // FINAL
-    ctx.font = "100px Arial"; ctx.fillText("🏠", 18000, canvas.height-200);
-    ctx.font = "40px Arial"; ctx.fillText("👩‍🦱👧👦👶", 18050, canvas.height-120);
+    // Meta Final
+    ctx.font = "120px Arial"; ctx.fillText("🏠", 30000, canvas.height - 200);
 
     ctx.restore();
     document.getElementById('donas').innerText = countDonas;
     document.getElementById('vidas').innerText = countVidas;
 }
 
-// CONTROLES
-const l = document.getElementById('left'), r = document.getElementById('right'), j = document.getElementById('jump');
-l.ontouchstart = e => { e.preventDefault(); keys.left = true; };
-l.ontouchend = () => keys.left = false;
-r.ontouchstart = e => { e.preventDefault(); keys.right = true; };
-r.ontouchend = () => keys.right = false;
-j.ontouchstart = e => { e.preventDefault(); if(player.saltos < 2) { player.vy = -15; player.saltos++; } };
+// Controles mejorados
+const setup = (id, k) => {
+    const el = document.getElementById(id);
+    el.ontouchstart = (e) => { e.preventDefault(); if(k === 'j'){ if(player.onGround) player.vy = -18; } else keys[k] = true; };
+    el.ontouchend = () => { if(k !== 'j') keys[k] = false; };
+};
+setup('left', 'left'); setup('right', 'right'); setup('jump', 'j');
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
-window.onload = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; buildLevel(); loop(); };
+init();
+window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
 </script>
 </body>
 </html>
