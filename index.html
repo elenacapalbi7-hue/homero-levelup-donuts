@@ -2,203 +2,181 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Odyssey GitHub v4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Homer Odyssey - Ergonomic Edition</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #000; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
+        #game-wrap { position: relative; width: 100vw; height: 100vh; background: #0a0a2a; }
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* UI Superior */
-        #ui { position: absolute; top: 45px; width: 100%; display: flex; justify-content: space-around; 
-              color: #00FF00; font-size: 20px; z-index: 50; text-shadow: 2px 2px #000; pointer-events: none; }
+        /* UI SUPERIOR */
+        #hud { position: absolute; top: 40px; width: 100%; display: flex; justify-content: space-around; 
+               color: #00FF00; font-weight: bold; font-size: 18px; z-index: 10; pointer-events: none; }
 
-        /* BOTONES MÁS GRANDES Y ELEVADOS */
-        .ctrl-panel { position: absolute; bottom: 180px; width: 100%; pointer-events: none; z-index: 100; }
+        /* CONTROLES ELEVADOS (Para no molestar la vista) */
+        .controls { position: absolute; bottom: 220px; width: 100%; pointer-events: none; z-index: 100; }
         .btn { 
-            position: absolute; width: 95px; height: 95px; 
-            background: rgba(255, 255, 255, 0.2); border: 4px solid #FFD700; 
-            border-radius: 50%; display: flex; justify-content: center; 
-            align-items: center; font-size: 40px; color: white; 
-            pointer-events: auto; -webkit-tap-highlight-color: transparent;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+            position: absolute; width: 85px; height: 85px; 
+            background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 215, 0, 0.5); 
+            border-radius: 50%; display: flex; justify-content: center; align-items: center; 
+            font-size: 35px; color: white; pointer-events: auto; -webkit-tap-highlight-color: transparent;
         }
-        #bL { left: 20px; }
-        #bR { left: 130px; }
-        #bA { right: 20px; width: 110px; height: 110px; background: rgba(255, 215, 0, 0.3); }
+        #btn-left { left: 20px; }
+        #btn-right { left: 120px; }
+        #btn-jump { right: 20px; width: 100px; height: 100px; border-width: 3px; }
 
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-                   background: rgba(0,0,0,0.9); display: flex; flex-direction: column; 
+        #msg-box { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+                   background: rgba(0,0,0,0.85); display: flex; flex-direction: column; 
                    justify-content: center; align-items: center; color: white; z-index: 200; text-align: center; }
-        .btn-go { padding: 20px 60px; font-size: 24px; background: #FFD700; border: none; border-radius: 15px; font-weight: bold; color: #000; }
+        .start-btn { padding: 15px 40px; font-size: 20px; background: #FFD700; border: none; border-radius: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="game-container">
-    <div id="ui">
-        <div>LVL: <span id="lvl">1</span></div>
-        <div>⏰: <span id="clocks">0</span>/10</div>
-        <div>❤️: <span id="lives">3</span></div>
+<div id="game-wrap">
+    <div id="hud">
+        <div>LVL: <span id="txt-lvl">1</span></div>
+        <div>⏰: <span id="txt-score">0</span>/10</div>
+        <div>❤️: <span id="txt-lives">3</span></div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="screen"></canvas>
 
-    <div class="ctrl-panel">
-        <div class="btn" id="bL">⬅️</div>
-        <div class="btn" id="bR">➡️</div>
-        <div class="btn" id="bA">🔘</div>
+    <div class="controls">
+        <div class="btn" id="btn-left">⬅️</div>
+        <div class="btn" id="btn-right">➡️</div>
+        <div class="btn" id="btn-jump">🔘</div>
     </div>
 
-    <div id="overlay">
-        <h1 id="title">HOMER 25</h1>
-        <p id="msg">Mantén presionado para correr.<br>¡Cuidado con lo que cae!</p>
-        <button class="btn-go" onclick="startGame()">¡JUGAR!</button>
+    <div id="msg-box">
+        <h1 id="m-title">HOMER RUN</h1>
+        <p id="m-desc">¡Relojes infinitos y bombas cayendo!</p>
+        <button class="start-btn" onclick="init()">¡JUGAR!</button>
     </div>
 </div>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
+    const canvas = document.getElementById('screen');
     const ctx = canvas.getContext('2d');
-    const lvlEl = document.getElementById('lvl'), livesEl = document.getElementById('lives'), 
-          clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay');
+    
+    let level = 1, score = 0, lives = 3, active = false, frame = 0;
+    let player = { x: 0, y: 0, w: 45, h: 55, vx: 0, vy: 0, jumpCount: 0 };
+    let inputs = { L: false, R: false };
+    let items = [], bombs = [], blocks = [];
 
-    let level = 1, score = 0, lives = 3, isPlaying = false, frame = 0;
-    let player = { x: 0, y: 0, w: 50, h: 60, vx: 0, vy: 0, grav: 0.7, jumps: 0, speed: 8 };
-    let items = [], obstacles = [], platforms = [];
-    let keys = { left: false, right: false }; // Estado de los botones
+    function setup() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', setup);
+    setup();
 
-    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    window.addEventListener('resize', resize);
-    resize();
-
-    function initLevel() {
-        score = 0; clocksEl.innerText = "0/10"; lvlEl.innerText = level;
-        items = []; obstacles = []; platforms = []; frame = 0;
+    function resetLvl() {
+        score = 0; items = []; bombs = []; blocks = []; frame = 0;
+        document.getElementById('txt-lvl').innerText = level;
+        document.getElementById('txt-score').innerText = "0/10";
         player.x = canvas.width / 2;
         player.y = canvas.height - 150;
-        player.vx = 0; player.vy = 0;
-        
+        player.vx = player.vy = 0;
+
         if(level === 2) {
-            for(let i=0; i<12; i++) {
-                platforms.push({x: Math.random()*(canvas.width-130), y: canvas.height - (i*160), w: 130, h: 20});
-            }
+            for(let i=0; i<15; i++) blocks.push({x: Math.random()*(canvas.width-120), y: canvas.height-(i*160), w: 120, h: 15});
         }
     }
 
-    function update() {
-        if(!isPlaying) return;
+    function loop() {
+        if(!active) return;
         frame++;
 
-        // Movimiento fluido (Mantener presionado)
-        if (keys.left) player.vx = -player.speed;
-        else if (keys.right) player.vx = player.speed;
+        // Movimiento personaje
+        if(inputs.L) player.vx = -7;
+        else if(inputs.R) player.vx = 7;
         else player.vx = 0;
 
-        player.vy += player.grav;
-        player.y += player.vy;
+        player.vy += 0.7; // Gravedad
         player.x += player.vx;
+        player.y += player.vy;
 
-        // --- LÓGICA NIVEL 2 (CÁMARA Y PELIGROS QUE CAEN) ---
+        // Suelo y Cámara Nivel 2
         if(level === 2) {
-            if(player.y < canvas.height / 2.5) {
-                let scroll = (canvas.height / 2.5) - player.y;
-                player.y = canvas.height / 2.5;
-                platforms.forEach(p => {
-                    p.y += scroll;
-                    if(p.y > canvas.height) { p.y = -20; p.x = Math.random()*(canvas.width-130); }
+            if(player.y < canvas.height * 0.4) {
+                let diff = (canvas.height * 0.4) - player.y;
+                player.y = canvas.height * 0.4;
+                blocks.forEach(b => {
+                    b.y += diff;
+                    if(b.y > canvas.height) { b.y = -20; b.x = Math.random()*(canvas.width-120); }
                 });
-                items.forEach(it => it.y += scroll);
-                obstacles.forEach(o => o.y += scroll);
+                items.forEach(it => it.y += diff);
+                bombs.forEach(bo => bo.y += diff);
             }
-            // En Nivel 2 los obstáculos CAEN del cielo
-            if(frame % 100 === 0) {
-                obstacles.push({ x: Math.random()*canvas.width, y: -50, vy: 5, vx: 0, type: 'bomb' });
-            }
-            if(player.y > canvas.height) die();
+            if(player.y > canvas.height) hurt();
+            if(frame % 90 === 0) bombs.push({x: Math.random()*canvas.width, y: -50, vy: 4 + level});
         } else {
-            // Obstáculos laterales en otros niveles
-            if(frame % 120 === 0) {
-                obstacles.push({ x: canvas.width, y: canvas.height - 110, vy: 0, vx: -5 - level, type: 'spike' });
-            }
+            if(player.y > canvas.height - 100) { player.y = canvas.height-100; player.vy = 0; player.jumpCount = 0; }
+            if(frame % 120 === 0) bombs.push({x: canvas.width, y: canvas.height-90, vx: -6 - level});
         }
 
-        // Suelo
-        if(level !== 2 && player.y > canvas.height - 100) { player.y = canvas.height - 100; player.vy = 0; player.jumps = 0; }
-
-        // Plataformas (Colisión)
-        platforms.forEach(p => {
-            if(player.x + player.w > p.x && player.x < p.x + p.w &&
-               player.y + player.h > p.y && player.y + player.h < p.y + p.h + 15 && player.vy > 0) {
-                player.y = p.y - player.h; player.vy = 0; player.jumps = 0;
+        // Bloques colisión
+        blocks.forEach(b => {
+            if(player.x + player.w > b.x && player.x < b.x + b.w && player.y + player.h > b.y && player.y + player.h < b.y + b.h + 10 && player.vy > 0) {
+                player.y = b.y - player.h; player.vy = 0; player.jumpCount = 0;
             }
         });
 
-        // Límites laterales
+        // Relojes Infinitos (Spawn si no hay)
+        if(items.length < 1) items.push({x: 30 + Math.random()*(canvas.width-60), y: -50, vy: 3});
+        items.forEach((it, i) => {
+            it.y += it.vy;
+            if(Math.hypot(player.x - it.x, player.y - it.y) < 50) {
+                score++; items.splice(i, 1);
+                document.getElementById('txt-score').innerText = score + "/10";
+                if(score >= 10) win();
+            }
+            if(it.y > canvas.height) items.splice(i, 1);
+        });
+
+        // Bombas
+        bombs.forEach((bo, i) => {
+            if(bo.vx) bo.x += bo.vx; else bo.y += bo.vy;
+            if(Math.hypot(player.x - bo.x, player.y - bo.y) < 40) { hurt(); bombs.splice(i, 1); }
+            if(bo.y > canvas.height || bo.x < -50) bombs.splice(i, 1);
+        });
+
         if(player.x < 0) player.x = 0;
         if(player.x > canvas.width - player.w) player.x = canvas.width - player.w;
 
-        // Relojes infinitos
-        if(items.length < 1) items.push({ x: 30 + Math.random()*(canvas.width-60), y: -50, vy: 3 });
-        items.forEach((it, i) => {
-            it.y += it.vy;
-            if(Math.hypot(player.x - it.x, player.y - it.y) < 55) {
-                score++; clocksEl.innerText = score + "/10";
-                items.splice(i, 1);
-                if(score >= 10) nextLevel();
-            }
-            if(it.y > canvas.height) items.splice(i,1);
-        });
-
-        // Obstáculos (Muerte)
-        obstacles.forEach((o, i) => {
-            o.x += o.vx; o.y += o.vy;
-            if(Math.hypot(player.x - o.x, player.y - o.y) < 45) { die(); obstacles.splice(i, 1); }
-            if(o.y > canvas.height || o.x < -50) obstacles.splice(i, 1);
-        });
+        render();
+        requestAnimationFrame(loop);
     }
 
-    function draw() {
-        ctx.fillStyle = "#1a0033"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    function render() {
+        ctx.fillStyle = "#0a0a2a"; ctx.fillRect(0,0,canvas.width, canvas.height);
         if(level !== 2) { ctx.fillStyle = "#00FF00"; ctx.fillRect(0, canvas.height-45, canvas.width, 45); }
-        
-        ctx.fillStyle = "#00BFFF";
-        platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
-
-        ctx.font = "45px Arial";
+        ctx.fillStyle = "#00BFFF"; blocks.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+        ctx.font = "40px Arial";
         items.forEach(it => ctx.fillText("⏰", it.x, it.y));
-        obstacles.forEach(o => ctx.fillText(o.type === 'bomb' ? "🔥" : "📦", o.x, o.y + 40));
-
-        ctx.font = "60px Arial";
-        ctx.fillText("🏃‍♂️", player.x, player.y + 55);
-
-        if(isPlaying) requestAnimationFrame(draw);
-        update();
+        bombs.forEach(bo => ctx.fillText("🔥", bo.x, bo.y + 35));
+        ctx.font = "50px Arial"; ctx.fillText("🏃‍♂️", player.x, player.y + 50);
     }
 
-    // CONTROLES DE ESTADO (MANTENER PRESIONADO)
-    const bl = document.getElementById('bL'), br = document.getElementById('bR'), ba = document.getElementById('bA');
+    // CONTROLES HOLD
+    document.getElementById('btn-left').ontouchstart = (e) => { e.preventDefault(); inputs.L = true; };
+    document.getElementById('btn-left').ontouchend = () => inputs.L = false;
+    document.getElementById('btn-right').ontouchstart = (e) => { e.preventDefault(); inputs.R = true; };
+    document.getElementById('btn-right').ontouchend = () => inputs.R = false;
+    document.getElementById('btn-jump').ontouchstart = (e) => { 
+        e.preventDefault(); 
+        if(player.jumpCount < 2) { player.vy = -15; player.jumpCount++; } 
+    };
 
-    bl.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
-    bl.addEventListener('touchend', () => keys.left = false);
-    
-    br.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
-    br.addEventListener('touchend', () => keys.right = false);
-
-    ba.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if(player.jumps < 2) { player.vy = -16; player.jumps++; }
-    });
-
-    function die() {
-        lives--; livesEl.innerText = lives;
-        if(lives <= 0) gameOver();
-        else { player.y = canvas.height - 250; player.vy = 0; player.x = canvas.width/2; }
+    function hurt() {
+        lives--; document.getElementById('txt-lives').innerText = lives;
+        if(lives <= 0) { active = false; document.getElementById('msg-box').style.display = "flex"; document.getElementById('m-title').innerText = "GAME OVER"; }
+        else { player.y = canvas.height - 300; player.vy = 0; }
     }
 
-    function startGame() { overlay.style.display = "none"; initLevel(); isPlaying = true; draw(); }
-    function nextLevel() { isPlaying = false; level++; overlay.style.display = "flex"; }
-    function gameOver() { isPlaying = false; level = 1; lives = 3; overlay.style.display = "flex"; }
+    function win() { active = false; level++; document.getElementById('msg-box').style.display = "flex"; document.getElementById('m-title').innerText = "¡SÍ!"; }
+    function init() { document.getElementById('msg-box').style.display = "none"; resetLvl(); active = true; loop(); }
 </script>
 </body>
 </html>
