@@ -3,112 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer's Real Adventure</title>
+    <title>Homer's Springfield Quest</title>
     <style>
-        body { margin: 0; background: #5c94fc; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
-        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; pointer-events: none; }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Arial Black', sans-serif; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; transition: background 0.5s; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; font-size: 1.2rem; pointer-events: none; }
         #controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; }
-        .btn { width: 70px; height: 70px; background: rgba(0,0,0,0.6); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; user-select: none; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: yellow; font-size: 2rem; text-shadow: 3px 3px #000; display: none; text-align: center; z-index: 100; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 80%; }
+        .btn { width: 70px; height: 70px; background: rgba(0,0,0,0.5); border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; user-select: none; }
+        #screen-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: yellow; text-align: center; text-shadow: 3px 3px #000; display: none; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 80%; z-index: 100; }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <div>🍩 <span id="donas">0</span></div>
-    <div>❤️ <span id="vidas">3</span></div>
-</div>
-<div id="msg"></div>
-
-<div id="controls">
-    <div style="display:flex; gap:15px;">
-        <div class="btn" id="left">⬅️</div>
-        <div class="btn" id="right">➡️</div>
+<div id="game-container">
+    <div id="ui">
+        <div>NIVEL: <span id="world-txt">1-1</span></div>
+        <div>🍩: <span id="donas">0</span></div>
+        <div>❤️: <span id="vidas">3</span></div>
     </div>
-    <div class="btn" id="jump">⬆️</div>
-</div>
+    
+    <div id="screen-msg"></div>
 
-<canvas id="canvas"></canvas>
+    <div id="controls">
+        <div style="display:flex; gap:15px;">
+            <div class="btn" id="left">⬅️</div>
+            <div class="btn" id="right">➡️</div>
+        </div>
+        <div class="btn" id="jump">⬆️</div>
+    </div>
+    <canvas id="canvas"></canvas>
+</div>
 
 <script>
+/** MOTOR DE JUEGO SIMPSON ADAPTADO DE MARIO BROS **/
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const msg = document.getElementById('screen-msg');
 
-let score = 0, lives = 3, camX = 0, active = true;
-let blocks = [], enemies = [], items = [], coins = [], particles = [];
+let world = 1, level = 1, donas = 0, vidas = 3, camX = 0, active = true;
+let blocks = [], enemies = [], items = [], coins = [], fx = [];
 let keys = { left: false, right: false };
 
 const p = { 
     x: 100, y: 0, w: 40, h: 70, vx: 0, vy: 0, 
-    isSuper: false, timer: 0, ground: false, jumps: 0 
+    isSuper: false, hasFire: false, star: 0, 
+    ground: false, jumps: 0 
 };
 
-function init() {
+function initLevel() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    p.y = canvas.height - 200;
-    buildLevel();
+    blocks = []; enemies = []; items = []; coins = []; fx = [];
+    p.x = 100; p.y = canvas.height - 200; p.vx = 0; p.vy = 0;
+    camX = 0; active = true;
+    msg.style.display = 'none';
+    
+    document.getElementById('world-txt').innerText = `${world}-${level}`;
+
+    if(world === 1 && level === 1) build1_1();
+    if(world === 1 && level === 2) build1_2();
+    if(world === 1 && level === 3) build1_3();
+    if(world === 1 && level === 4) build1_4();
+    
     loop();
 }
 
-// DISEÑO DE NIVEL MANUAL (Cambiante, no repetitivo)
-function buildLevel() {
-    blocks = []; enemies = []; items = []; coins = [];
+// --- CONSTRUCCIÓN DE NIVELES SEGÚN TU SOLICITUD ---
+
+function build1_1() {
+    document.getElementById('game-container').style.background = "#5c94fc"; // Día
     const gY = canvas.height - 80;
-
-    // 1. ZONA INICIAL (Piso estable)
-    for(let i=0; i<30; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+    // Suelo
+    for(let i=0; i<200; i++) if(!(i>120 && i<125)) blocks.push({x: i*40, y: gY, t: 'G'});
     
-    // Bloques de tutorial
-    addBlock(15*40, gY-160, '?', 'beer'); 
-    addBlock(16*40, gY-160, 'B');
-    addBlock(17*40, gY-160, '?', 'dona');
+    // 1. Primer Flanders
+    enemies.push({x: 600, y: gY-40, vx: -2, t:'F'});
 
-    // 2. PRIMERA TUBERÍA Y FLANDERS
-    addPipe(35*40, gY);
-    addEnemy(38*40, gY-40);
+    // 2. Primeros bloques (formación triangular)
+    // 3 abajo ladrillo
+    addBlock(800, gY-120, 'B'); addBlock(840, gY-120, 'B'); addBlock(880, gY-120, 'B');
+    // 3 arriba ?
+    addBlock(800, gY-240, '?', 'beer'); // Super Hongo (Duff)
+    addBlock(840, gY-240, '?', 'dona'); addBlock(880, gY-240, '?', 'dona');
 
-    // 3. ZONA DE SALTOS (Abismo con plataformas)
-    for(let i=45; i<55; i++) {
-        if(i % 3 === 0) blocks.push({x: i*40, y: gY-120, t: 'B'});
-        coins.push({x: i*40 + 10, y: gY-180});
-    }
+    // 3. Tuberías (4 en fila)
+    addPipe(1200, gY, 2); addPipe(1500, gY, 3); addPipe(1800, gY, 4); addPipe(2100, gY, 4, true); // 4ta secreta
 
-    // 4. ZONA MEDIA (Estructura de ladrillos)
-    for(let i=60; i<100; i++) blocks.push({x: i*40, y: gY, t: 'G'});
-    for(let i=0; i<5; i++) addBlock((70+i)*40, gY-160, i === 2 ? '?' : 'B', i === 2 ? 'beer' : null);
-    addEnemy(75*40, gY-40);
-    addEnemy(85*40, gY-40);
+    // 4. Estrella y Koopa (Sr Burns)
+    addBlock(3000, gY-120, 'B'); addBlock(3040, gY-120, 'B', 'star'); // Estrella
+    enemies.push({x: 3200, y: gY-40, vx: -2, t:'K'}); // Koopa (Burns)
 
-    // 5. SEGUNDA TUBERÍA Y SUBIDA
-    addPipe(105*40, gY);
-    addBlock(105*40, gY-180, '?', 'star', 5); // Bloque de 5 donas
+    // Final
+    addFlag(7000, gY);
+}
 
-    // 6. RECTA FINAL
-    for(let i=115; i<160; i++) blocks.push({x: i*40, y: gY, t: 'G'});
-    addPipe(130*40, gY);
-    addEnemy(135*40, gY-40);
+function build1_2() {
+    document.getElementById('game-container').style.background = "#202020"; // Subterráneo
+    const gY = canvas.height - 80;
+    for(let i=0; i<200; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+
+    // 1. Inicio: 5 bloques ?
+    for(let i=0; i<5; i++) addBlock(400 + (i*40), gY-160, '?', i===0?'beer':'dona');
+    enemies.push({x: 600, y: gY-40, vx: -2, t:'F'});
+
+    // 5. Tuberías con Plantas
+    addPipe(2000, gY, 3, false, true); 
+
+    addFlag(7000, gY);
+}
+
+function build1_3() {
+    document.getElementById('game-container').style.background = "#a0d8f8"; // Cumbres
+    const gY = canvas.height - 80;
+    // Nivel de plataformas
+    for(let i=0; i<10; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+    blocks.push({x: 600, y: gY-120, t: 'B', w: 200}); // Plataformas tipo árbol
+    blocks.push({x: 1000, y: gY-200, t: 'B', w: 200});
     
-    // Casa al final (en x = 155 * 40 = 6200)
+    addFlag(5000, gY);
 }
 
-function addBlock(x, y, t, content = null, hits = 1) {
-    blocks.push({x, y, t, content, hits});
+function build1_4() {
+    document.getElementById('game-container').style.background = "#400000"; // Castillo Planta Nuclear
+    const gY = canvas.height - 80;
+    for(let i=0; i<200; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+
+    // Jefe final
+    enemies.push({x: 4000, y: gY-120, vx: 0, t:'BOS'}); // Burns Gigante
+    blocks.push({x: 4200, y: gY-40, t: 'AXE'}); // Hacha
 }
 
-function addPipe(x, y) {
-    blocks.push({x, y: y-40, t: 'P'});
-    blocks.push({x, y: y-80, t: 'P'});
-}
+// --- FUNCIONES AUXILIARES ---
 
-function addEnemy(x, y) {
-    enemies.push({x, y, vx: -2, vy: 0, w: 40, h: 45, ground: false});
+function addBlock(x, y, t, item=null, hits=1) { blocks.push({x, y, t, item, hits}); }
+function addPipe(x, y, h, secret=false, plant=false) {
+    for(let i=1; i<=h; i++) blocks.push({x, y: y-(i*40), t: 'P'});
 }
+function addFlag(x, y) { blocks.push({x, y: y-300, t: 'F_POLE'}); }
 
 function update() {
     if(!active) return;
 
-    // Movimiento Homero
+    // Física Homero
     if (keys.left) p.vx = -6;
     else if (keys.right) p.vx = 6;
     else p.vx *= 0.85;
@@ -118,78 +155,88 @@ function update() {
     p.y += p.vy;
     camX = p.x - 100;
 
-    if (p.timer > 0) { p.timer--; p.isSuper = true; } else { p.isSuper = false; }
+    if(p.star > 0) p.star--;
 
     p.ground = false;
     blocks.forEach((b, idx) => {
-        if (p.x + p.w > b.x && p.x < b.x + 40 && p.y + p.h > b.y && p.y < b.y + 40) {
+        let bw = b.w || 40;
+        let bh = b.h || 40;
+        if (p.x + p.w > b.x && p.x < b.x + bw && p.y + p.h > b.y && p.y < b.y + bh) {
+            if(b.t === 'F_POLE') { win(); return; }
+            if(b.t === 'AXE') { win(); return; }
+
             if (p.vy > 0 && p.y + p.h - p.vy <= b.y) {
                 p.y = b.y - p.h; p.vy = 0; p.ground = true; p.jumps = 0;
-            } else if (p.vy < 0 && p.y - p.vy >= b.y + 40) {
-                p.y = b.y + 40; p.vy = 2;
-                handleHit(b, idx);
+            } else if (p.vy < 0 && p.y - p.vy >= b.y + bh) {
+                p.y = b.y + bh; p.vy = 2;
+                hitBlock(b, idx);
             } else {
                 if(p.vx > 0) p.x = b.x - p.w;
-                if(p.vx < 0) p.x = b.x + 40;
+                if(p.vx < 0) p.x = b.x + bw;
             }
         }
     });
 
-    // Enemigos con Gravedad (Ya no flotan)
+    // Enemigos
     enemies.forEach((en, idx) => {
-        en.vy += 0.8;
         en.x += en.vx;
-        en.y += en.vy;
-        
-        let onAnyGround = false;
-        blocks.forEach(b => {
-            if (en.x + en.w > b.x && en.x < b.x + 40 && en.y + en.h > b.y && en.y < b.y + 40) {
-                if (en.vy > 0) { en.y = b.y - en.h; en.vy = 0; onAnyGround = true; }
-                else en.vx *= -1;
+        if(Math.abs(p.x - en.x) < 40 && Math.abs(p.y - en.y) < 50) {
+            if(p.vy > 0 || p.star > 0) { 
+                enemies.splice(idx, 1); 
+                if(p.vy > 0) p.vy = -12; 
+            } else if(!p.isSuper) {
+                die();
+            } else {
+                p.isSuper = false; p.h = 70; // Encoger
             }
-        });
-        if(!onAnyGround && en.y > canvas.height) enemies.splice(idx, 1);
-
-        if(Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 50) {
-            if(p.vy > 0) { enemies.splice(idx, 1); p.vy = -12; }
-            else if(!p.isSuper) reset();
         }
     });
 
-    // Items (Cerveza)
+    // Items
     items.forEach((it, idx) => {
-        it.x += it.vx; it.vy += 0.8; it.y += it.vy;
-        blocks.forEach(b => {
-            if(it.x < b.x+40 && it.x+30 > b.x && it.y+30 > b.y && it.y < b.y+40) {
-                if(it.vy > 0) { it.y = b.y-30; it.vy = 0; } else it.vx *= -1;
-            }
-        });
-        if(Math.hypot(p.x - it.x, p.y - it.y) < 45) { p.timer = 600; items.splice(idx, 1); }
+        it.y += 2;
+        if(Math.hypot(p.x-it.x, p.y-it.y) < 50) {
+            if(it.t === 'beer') { p.isSuper = true; p.h = 100; }
+            if(it.t === 'star') { p.star = 600; }
+            items.splice(idx, 1);
+        }
     });
 
-    coins.forEach((c, i) => { if(Math.hypot(p.x-c.x, p.y-c.y) < 40) { coins.splice(i,1); score++; }});
-    if(p.y > canvas.height) reset();
-    if(p.x > 6100) win();
+    if(p.y > canvas.height) die();
 }
 
-function handleHit(b, idx) {
-    if(b.t === '?') {
-        if(b.content === 'beer') {
-            items.push({x: b.x, y: b.y-40, vx: 2, vy: -5, t:'🍺'});
-            b.t = 'U';
-        } else {
-            particles.push({x: b.x, y: b.y-40, vy: -6, l: 20}); score++;
-            if(b.content === 'star') {
-                b.hits--; if(b.hits <= 0) b.t = 'U';
-            } else b.t = 'U';
-        }
-    } else if(p.isSuper && b.t === 'B') {
-        blocks.splice(idx, 1);
+function hitBlock(b, idx) {
+    if(b.t === '?' || b.t === 'B') {
+        if(b.item === 'beer') items.push({x: b.x, y: b.y-40, t:'beer'});
+        if(b.item === 'star') items.push({x: b.x, y: b.y-40, t:'star'});
+        if(b.item === 'dona') { donas++; fx.push({x: b.x, y: b.y-40, l:20}); }
+        if(b.t === '?') b.t = 'U';
+        else if(p.isSuper && b.t === 'B' && !b.item) blocks.splice(idx, 1);
     }
 }
 
-function reset() { lives--; p.x = 100; p.y = 0; if(lives <= 0) location.reload(); }
-function win() { active = false; document.getElementById('msg').innerHTML = "¡LO LOGRASTE! 🏠<br>Llegaste a casa"; document.getElementById('msg').style.display = 'block'; }
+function die() {
+    vidas--;
+    if(vidas <= 0) {
+        msg.innerHTML = "¡D'OH!<br>GAME OVER";
+        msg.style.display = 'block';
+        active = false;
+        setTimeout(() => { world=1; level=1; vidas=3; donas=0; initLevel(); }, 3000);
+    } else {
+        initLevel();
+    }
+}
+
+function win() {
+    active = false;
+    msg.innerHTML = "¡EXCELENTE!<br>Nivel Completado";
+    msg.style.display = 'block';
+    setTimeout(() => {
+        level++;
+        if(level > 4) { world++; level=1; }
+        initLevel();
+    }, 3000);
+}
 
 function draw() {
     ctx.clearRect(0,0, canvas.width, canvas.height);
@@ -197,44 +244,49 @@ function draw() {
     ctx.translate(-camX, 0);
 
     blocks.forEach(b => {
-        ctx.fillStyle = b.t==='G'?'#944828': b.t==='P'?'#27ae60': b.t==='B'?'#e76e33': b.t==='U'?'#7f8c8d':'#f1c40f';
-        ctx.fillRect(b.x, b.y, 40, 40);
-        ctx.strokeRect(b.x, b.y, 40, 40);
-        if(b.t === '?') { ctx.fillStyle='#fff'; ctx.font="20px Arial"; ctx.fillText("?", b.x+15, b.y+28); }
+        if(b.t === 'G') ctx.fillStyle = '#944828';
+        else if(b.t === 'P') ctx.fillStyle = '#27ae60';
+        else if(b.t === 'B') ctx.fillStyle = '#e76e33';
+        else if(b.t === '?') ctx.fillStyle = '#f1c40f';
+        else if(b.t === 'U') ctx.fillStyle = '#7f8c8d';
+        else if(b.t === 'F_POLE') ctx.fillStyle = '#fff';
+        else ctx.fillStyle = 'red';
+        
+        ctx.fillRect(b.x, b.y, b.w||40, b.h||40);
+        ctx.strokeStyle = 'black'; ctx.strokeRect(b.x, b.y, b.w||40, b.h||40);
+        if(b.t === '?') { ctx.fillStyle='white'; ctx.fillText("?", b.x+15, b.y+25); }
     });
 
-    enemies.forEach(en => { ctx.font="45px Arial"; ctx.fillText("👨‍🏫", en.x, en.y+42); });
-    items.forEach(it => { ctx.font="35px Arial"; ctx.fillText(it.t, it.x, it.y+30); });
-    coins.forEach(c => { ctx.font="25px Arial"; ctx.fillText("🍩", c.x, c.y+25); });
-    particles.forEach((f, i) => { f.y += f.vy; f.l--; ctx.fillText("🍩", f.x+10, f.y); if(f.l<0) particles.splice(i,1); });
+    enemies.forEach(en => {
+        ctx.font = en.t==='BOS'?"100px Arial":"40px Arial";
+        ctx.fillText(en.t==='K'?"💰": (en.t==='BOS'?"👴":"👨‍🏫"), en.x, en.y+35);
+    });
 
-    let s = p.isSuper ? 1.3 : 1;
-    ctx.font = (40*s)+"px Arial";
-    ctx.fillText("👨‍🦲", p.x, p.y + (35*s));
-    ctx.font = (35*s)+"px Arial";
-    ctx.fillText("👕", p.x, p.y + (60*s));
-    ctx.fillText("👖", p.x, p.y + (85*s));
+    items.forEach(it => ctx.fillText(it.t==='beer'?"🍺":"⭐", it.x, it.y+30));
+    coins.forEach(c => ctx.fillText("🍩", c.x, c.y+30));
+    fx.forEach((f, i) => { f.y--; f.l--; ctx.fillText("🍩", f.x, f.y); if(f.l<0) fx.splice(i,1); });
 
-    ctx.font="120px Arial"; ctx.fillText("🏠", 6200, canvas.height-200);
+    // DIBUJAR HOMERO
+    if(p.star % 10 < 5) {
+        ctx.font = p.h + "px Arial";
+        ctx.fillText("👨‍🦲", p.x, p.y + p.h - 10);
+    }
+
     ctx.restore();
-    document.getElementById('donas').innerText = score;
-    document.getElementById('vidas').innerText = lives;
+    document.getElementById('donas').innerText = donas;
+    document.getElementById('vidas').innerText = vidas;
 }
 
+// Controles
 const ctrl = (id, k) => {
     const el = document.getElementById(id);
-    el.ontouchstart = (e) => { 
-        e.preventDefault(); 
-        if(k==='j') { 
-            if(p.jumps < 2) { p.vy = -16; p.jumps++; } 
-        } else keys[k]=true; 
-    };
+    el.ontouchstart = (e) => { e.preventDefault(); if(k==='j') { if(p.jumps<2) { p.vy=-16; p.jumps++; } } else keys[k]=true; };
     el.ontouchend = () => { if(k!=='j') keys[k]=false; };
 };
 ctrl('left', 'left'); ctrl('right', 'right'); ctrl('jump', 'j');
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
-init();
+window.onload = initLevel;
 </script>
 </body>
 </html>
