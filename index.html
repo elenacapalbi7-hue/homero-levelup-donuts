@@ -3,74 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Homer 25: Edición Definitiva</title>
+    <title>Homer Odyssey Fix</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #000b1a; overflow: hidden; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #001a33; display: flex; flex-direction: column; }
         
-        /* UI de alto contraste */
-        #ui { position: absolute; top: 35px; width: 100%; display: flex; justify-content: space-around; color: #00FF00; text-shadow: 2px 2px #000; z-index: 50; font-size: 16px; pointer-events: none; }
-        #mode-info { position: absolute; top: 65px; width: 100%; text-align: center; color: #FFD700; font-size: 14px; z-index: 50; text-transform: uppercase; }
+        /* Área de juego */
+        #canvas-wrap { flex-grow: 1; position: relative; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
 
-        /* Controles minimalistas en las esquinas */
-        #controls { position: absolute; bottom: 30px; width: 100%; height: 80px; z-index: 80; pointer-events: none; }
-        .btn { 
-            position: absolute; width: 70px; height: 70px; 
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); 
-            border-radius: 15px; display: flex; justify-content: center; 
-            align-items: center; font-size: 24px; pointer-events: auto;
-        }
-        #bL { left: 15px; bottom: 0; }
-        #bR { left: 95px; bottom: 0; }
-        #bC { right: 15px; bottom: 0; width: 80px; height: 80px; border: 2px solid #FFD700; background: rgba(255,215,0,0.05); }
+        /* Panel de Controles Fijo al fondo */
+        #control-panel { height: 160px; background: #111; border-top: 4px solid #FFD700; display: flex; justify-content: space-around; align-items: center; padding: 0 10px; z-index: 100; }
+        
+        .btn { width: 80px; height: 80px; background: #333; border: 3px solid #FFD700; border-radius: 15px; display: flex; justify-content: center; align-items: center; font-size: 30px; color: white; -webkit-tap-highlight-color: transparent; }
+        .btn:active { background: #555; transform: scale(0.95); }
 
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
-        .btn-action { padding: 15px 35px; font-size: 18px; background: #FFD700; color: #000; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        #ui { position: absolute; top: 40px; width: 100%; display: flex; justify-content: space-around; color: #00FF00; font-weight: bold; font-size: 20px; text-shadow: 2px 2px #000; pointer-events: none; }
+        
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 200; text-align: center; }
+        .btn-start { padding: 20px 40px; font-size: 22px; background: #FFD700; border: none; border-radius: 10px; font-weight: bold; margin-top: 20px; }
     </style>
 </head>
 <body>
 
 <div id="game-container">
     <div id="ui">
-        <div>LVL <span id="lvl">1</span></div>
-        <div>❤️ <span id="lives">3</span></div>
-        <div>⏰ <span id="clocks">0</span>/10</div>
-    </div>
-    <div id="mode-info">CARGANDO...</div>
-
-    <div id="overlay">
-        <h1 id="title">HOMER 25</h1>
-        <p id="msg">Ajustando visibilidad...</p>
-        <button class="btn-action" id="startBtn">COMENZAR</button>
+        <div>LVL: <span id="lvl">1</span></div>
+        <div>⏰: <span id="clocks">0</span>/10</div>
+        <div>❤️: <span id="lives">3</span></div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <div id="canvas-wrap">
+        <canvas id="gameCanvas"></canvas>
+        <div id="overlay">
+            <h1 id="title">HOMER RUN</h1>
+            <p id="msg">Atrapa 10 relojes</p>
+            <button class="btn-start" onclick="startGame()">¡EMPEZAR!</button>
+        </div>
+    </div>
 
-    <div id="controls">
+    <div id="control-panel">
         <div class="btn" id="bL">⬅️</div>
-        <div class="btn" id="bR">➡️</div>
         <div class="btn" id="bC">🔘</div>
+        <div class="btn" id="bR">➡️</div>
     </div>
 </div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const lvlEl = document.getElementById('lvl'), livesEl = document.getElementById('lives'), clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay'), modeTxt = document.getElementById('mode-info'), startBtn = document.getElementById('startBtn');
+    const lvlEl = document.getElementById('lvl'), livesEl = document.getElementById('lives'), clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay');
 
     let level = 1, score = 0, lives = 3, isPlaying = false, frame = 0;
-    let player = { x: 0, y: 0, vx: 0, vy: 0, grav: 0.6, jumps: 0 };
+    let player = { x: 0, y: 0, vx: 0, vy: 0, grav: 0.8, jumps: 0 };
     let items = [], obstacles = [];
 
-    const levels = [
-        { n: "RECOLECTOR", h: "Atrapa los relojes antes de que caigan." },
-        { n: "EL RADAR", h: "Pantalla oscura. Sigue el brillo para hallar el reloj." },
-        { n: "DASH TELEFÓNICO", h: "🔘 para teletransportarte arriba, flechas para los lados." },
-        { n: "GRAVEDAD LENTA", h: "Todo cae más despacio, pero hay más obstáculos." },
-        { n: "ACELERACIÓN", h: "¡Cuidado! La velocidad aumenta cada 2 relojes." }
-    ];
-
-    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+    }
     window.addEventListener('resize', resize);
     resize();
 
@@ -78,131 +69,11 @@
         score = 0; clocksEl.innerText = "0/10"; lvlEl.innerText = level;
         items = []; obstacles = []; frame = 0;
         player.x = canvas.width / 2 - 30;
-        player.y = canvas.height - 150;
+        player.y = canvas.height - 100;
         player.vx = 0; player.vy = 0;
-        modeTxt.innerText = "MODO: " + (levels[level-1]?.n || "DESAFÍO FINAL");
     }
 
     function spawn() {
         if(items.length < 1) {
             items.push({
-                x: 50 + Math.random()*(canvas.width-100),
-                y: (level === 2 || level === 3) ? 100 + Math.random()*(canvas.height-300) : -50,
-                vy: 1.5 + (level * 0.2), // Velocidad reducida para mejor control
-                timer: 0
-            });
-        }
-        if(frame % 200 === 0) {
-            obstacles.push({ x: canvas.width + 50, y: canvas.height - 130, vx: -3 - (level*0.4), e: '🚧' });
-        }
-    }
-
-    function update() {
-        if(!isPlaying) return;
-        frame++;
-        spawn();
-
-        if(level !== 2 && level !== 3) { // Movimiento Normal
-            player.vy += player.grav;
-            player.x += player.vx; player.y += player.vy;
-            if(player.y > canvas.height - 130) { player.y = canvas.height - 130; player.vy = 0; player.jumps = 0; }
-        }
-
-        // Colisiones
-        items.forEach((it, i) => {
-            if(level !== 2 && level !== 3) it.y += it.vy;
-            if(Math.hypot(player.x - it.x, player.y - it.y) < 60) {
-                score++; clocksEl.innerText = score + "/10";
-                items.splice(i,1);
-                if(score >= 10) nextLevel();
-            }
-            if(it.y > canvas.height) items.splice(i,1);
-        });
-
-        obstacles.forEach((o, i) => {
-            o.x += o.vx;
-            if(Math.hypot(player.x - o.x, player.y - o.y) < 50) {
-                lives--; livesEl.innerText = lives; obstacles.splice(i,1);
-                if(lives <= 0) gameOver();
-            }
-        });
-
-        if(player.x < 0) player.x = 0;
-        if(player.x > canvas.width-60) player.x = canvas.width-60;
-    }
-
-    function draw() {
-        // Fondo negro puro para contraste
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0,0,canvas.width, canvas.height);
-        
-        if(level === 2) { // Efecto Radar
-            items.forEach(it => {
-                let grad = ctx.createRadialGradient(it.x+25, it.y+25, 0, it.x+25, it.y+25, 150);
-                grad.addColorStop(0, "rgba(255,215,0,0.3)");
-                grad.addColorStop(1, "transparent");
-                ctx.fillStyle = grad;
-                ctx.fillRect(0,0,canvas.width, canvas.height);
-            });
-        }
-
-        // Suelo Neón
-        ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(0, canvas.height-80); ctx.lineTo(canvas.width, canvas.height-80); ctx.stroke();
-
-        // Items con Glow
-        ctx.shadowBlur = 15; ctx.shadowColor = "#FFD700";
-        ctx.font = "50px Arial";
-        items.forEach(it => ctx.fillText("⏰", it.x, it.y));
-        
-        // Obstáculos
-        ctx.shadowColor = "#FF0000";
-        obstacles.forEach(o => ctx.fillText(o.e, o.x, o.y + 40));
-
-        // Homero
-        ctx.shadowColor = "#FFF";
-        ctx.fillText("🏃‍♂️", player.x, player.y + 60);
-        ctx.shadowBlur = 0;
-
-        if(isPlaying) requestAnimationFrame(() => { update(); draw(); });
-    }
-
-    function nextLevel() {
-        isPlaying = false; level++;
-        overlay.style.display = "flex";
-        document.getElementById('title').innerText = "¡BIEN HECHO!";
-        document.getElementById('msg').innerText = levels[level-1]?.h || "Siguiente desafío...";
-    }
-
-    function gameOver() {
-        isPlaying = false; lives = 3; level = 1;
-        overlay.style.display = "flex";
-        document.getElementById('title').innerText = "D'OH!";
-        startBtn.innerText = "REINTENTAR";
-    }
-
-    function startGame() { overlay.style.display="none"; initLevel(); isPlaying=true; draw(); }
-
-    // CONTROLES
-    bL.ontouchstart = (e) => { 
-        e.preventDefault(); 
-        if(level === 3) player.x -= 80;
-        else player.vx = -6; 
-    };
-    bR.ontouchstart = (e) => { 
-        e.preventDefault(); 
-        if(level === 3) player.x += 80;
-        else player.vx = 6; 
-    };
-    bL.ontouchend = bR.ontouchend = () => { if(level !== 3) player.vx = 0; };
-
-    bC.ontouchstart = (e) => {
-        e.preventDefault();
-        if(level === 3) player.y -= 100;
-        else if(player.jumps < 2) { player.vy = -14; player.jumps++; }
-    };
-
-    startBtn.onclick = startGame;
-</script>
-</body>
-</html>
+                x: 50 + Math.random()*(
