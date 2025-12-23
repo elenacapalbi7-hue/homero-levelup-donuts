@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Runner - Nivel 2</title>
+    <title>Homer Runner - Pro Level 2</title>
     <style>
         body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #87CEEB; overflow: hidden; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; overflow: hidden; }
         
         #ui {
-            position: absolute; top: 20px; width: 100%;
+            position: absolute; top: 15px; width: 100%;
             display: flex; justify-content: space-around;
             color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 18px;
         }
@@ -21,12 +21,11 @@
         }
 
         .btn-action {
-            padding: 20px 60px; font-size: 28px; background: #4CAF50; color: white;
-            border: none; border-radius: 15px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 6px #2e7d32;
+            padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333;
+            border: none; border-radius: 12px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 6px #b8860b;
         }
 
-        /* CONTROL DE SALTO ELEVADO */
         #controls {
             position: absolute; bottom: 130px; width: 100%;
             display: flex; justify-content: center; z-index: 20;
@@ -37,7 +36,6 @@
             border: 4px solid white; border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
             font-size: 45px; color: white; user-select: none;
-            -webkit-tap-highlight-color: transparent;
         }
 
         canvas { display: block; }
@@ -54,8 +52,8 @@
 
     <div id="overlay">
         <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Usa el DOBLE SALTO!<br>Atrapa 10 relojes.<br>¡Cuidado con el tráfico!</p>
-        <button class="btn-action" id="mainBtn">¡A CORRER!</button>
+        <p id="msg">¡Corre a la Planta Nuclear!<br>Usa el doble salto para grupos de objetos.</p>
+        <button class="btn-action" id="mainBtn">¡EMPEZAR!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -80,70 +78,89 @@
     let lives = 3;
     let frameCount = 0;
     let items = [];
-    let gameSpeed = 5;
+    let scenery = []; // Nubes y arbustos
+    let gameSpeed = 6;
 
     const player = {
-        x: 50, y: 0, w: 70, h: 90,
-        vy: 0, gravity: 0.7, jumpPower: -14,
-        jumps: 0, maxJumps: 2, // DOBLE SALTO
+        x: 60, y: 0, w: 70, h: 90,
+        vy: 0, gravity: 0.8, jumpPower: -15,
+        jumps: 0, maxJumps: 2,
         emoji: "🏃‍♂️"
     };
-
-    const obstacles = [
-        {e: '🗑️', type: 'bad'}, 
-        {e: '🚧', type: 'bad'}, 
-        {e: '🚗', type: 'bad'}, // Auto de Juan Topo
-        {e: '📦', type: 'bad'},
-        {e: '⏰', type: 'clock'},
-        {e: '🍩', type: 'donut'}
-    ];
 
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        player.y = canvas.height - player.h - 40;
+        player.y = canvas.height - player.h - 50;
     }
     window.addEventListener('resize', resize);
     resize();
 
-    function spawn() {
-        const rand = Math.random();
-        let obj;
-        
-        if (rand < 0.2) obj = obstacles[4]; // Reloj
-        else if (rand < 0.4) obj = obstacles[5]; // Dona
-        else obj = obstacles[Math.floor(Math.random() * 4)]; // Obstáculos malos
+    // Crear nubes y arbustos decorativos
+    function initScenery() {
+        scenery = [];
+        for(let i=0; i<5; i++) {
+            scenery.push({ x: Math.random()*canvas.width, y: 50+Math.random()*100, s: 0.5+Math.random(), e: '☁️' });
+            scenery.push({ x: Math.random()*canvas.width, y: canvas.height-90, s: gameSpeed, e: '🌳' });
+        }
+    }
 
-        items.push({
-            x: canvas.width + 100,
-            y: (obj.type !== 'bad' || Math.random() > 0.5) ? canvas.height - 180 - Math.random() * 80 : canvas.height - 90,
-            size: 55, 
-            type: obj.type, 
-            emoji: obj.e
-        });
+    function spawn() {
+        const typeRoll = Math.random();
+        let xPos = canvas.width + 50;
+        
+        // RELOJES más frecuentes (cada 3-4 segundos máximo)
+        if (typeRoll < 0.25) {
+            items.push({ x: xPos, y: canvas.height - 200, size: 50, type: 'clock', emoji: '⏰' });
+        } 
+        // DONAS
+        else if (typeRoll < 0.45) {
+            items.push({ x: xPos, y: canvas.height - 150 - Math.random()*100, size: 45, type: 'donut', emoji: '🍩' });
+        }
+        // OBSTÁCULOS COMPUESTOS (El "secreto" para que no sea básico)
+        else {
+            const pattern = Math.random();
+            if(pattern < 0.4) {
+                // Fila de 3 cajas
+                for(let i=0; i<3; i++) items.push({ x: xPos + (i*50), y: canvas.height - 95, size: 45, type: 'bad', emoji: '📦' });
+            } else if(pattern < 0.7) {
+                // Valla con algo encima
+                items.push({ x: xPos, y: canvas.height - 95, size: 55, type: 'bad', emoji: '🚧' });
+                items.push({ x: xPos, y: canvas.height - 150, size: 40, type: 'bad', emoji: '🥫' });
+            } else {
+                // El auto de Juan Topo (rápido)
+                items.push({ x: xPos, y: canvas.height - 100, size: 65, type: 'bad', emoji: '🚗' });
+            }
+        }
     }
 
     function update() {
         if (!isPlaying) return;
 
-        // Física
         player.vy += player.gravity;
         player.y += player.vy;
+        const groundY = canvas.height - player.h - 50;
 
-        const groundY = canvas.height - player.h - 40;
         if (player.y > groundY) {
             player.y = groundY;
             player.vy = 0;
-            player.jumps = 0; // Reinicia saltos al tocar suelo
+            player.jumps = 0;
         }
 
-        if (frameCount % 90 === 0) spawn();
+        // Mover Escenario
+        scenery.forEach(s => {
+            s.x -= s.s;
+            if(s.x < -100) s.x = canvas.width + 100;
+        });
+
+        // Spawn cada 70 frames aprox (más rápido)
+        if (frameCount % 75 === 0) spawn();
 
         for (let i = items.length - 1; i >= 0; i--) {
             let it = items[i];
             it.x -= gameSpeed;
 
-            // Colisión precisa
+            // Colisión
             if (player.x < it.x + it.size - 15 && player.x + player.w - 15 > it.x &&
                 player.y < it.y + it.size - 15 && player.y + player.h > it.y) {
                 
@@ -162,7 +179,7 @@
                 items.splice(i, 1);
                 continue;
             }
-            if (it.x < -100) items.splice(i, 1);
+            if (it.x < -200) items.splice(i, 1);
         }
         frameCount++;
     }
@@ -170,19 +187,23 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Calle con movimiento
-        ctx.fillStyle = "#555";
-        ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-        ctx.fillStyle = "#FFF";
-        for(let i=0; i<15; i++) {
-            ctx.fillRect((i*80) - (frameCount*gameSpeed % 80), canvas.height-22, 30, 4);
-        }
+        // Dibujar Escenario Parallax
+        scenery.forEach(s => {
+            ctx.font = (s.e === '☁️' ? "60px" : "40px") + " Arial";
+            ctx.fillText(s.e, s.x, s.y);
+        });
 
-        // Homero
+        // Calle
+        ctx.fillStyle = "#444";
+        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+        ctx.fillStyle = "white";
+        for(let i=0; i<10; i++) ctx.fillRect((i*150) - (frameCount*gameSpeed % 150), canvas.height-30, 50, 6);
+
+        // Personaje
         ctx.font = player.h + "px Arial";
         ctx.fillText(player.emoji, player.x, player.y + player.h);
 
-        // Elementos
+        // Items
         items.forEach(it => {
             ctx.font = it.size + "px Arial";
             ctx.fillText(it.emoji, it.x, it.y + it.size);
@@ -195,6 +216,7 @@
         scoreClocks = 0; scoreDonuts = 0; lives = 3; items = []; frameCount = 0;
         clocksEl.innerText = "0"; donutsEl.innerText = "0"; livesEl.innerText = "3";
         overlay.style.display = "none";
+        initScenery();
         isPlaying = true;
         draw();
     }
