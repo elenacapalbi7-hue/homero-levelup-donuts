@@ -3,43 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer: Nivel 1</title>
+    <title>Homer: Nivel 1 - Limpieza de Garaje</title>
     <style>
-        /* ESTILO GENERAL */
-        body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial', sans-serif; touch-action: none; }
+        body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
         
         #game-container { 
             position: relative; 
             width: 100vw; 
             height: 100vh; 
-            background: #87CEEB; /* Azul cielo */
-            margin: 0 auto;
+            background: #87CEEB; 
             overflow: hidden;
         }
 
-        /* UI SUPERIOR */
         #ui {
             position: absolute;
-            top: 15px;
+            top: 20px;
             width: 100%;
             display: flex;
-            justify-content: space-between;
-            padding: 0 25px;
-            box-sizing: border-box;
-            font-size: 26px;
-            font-weight: bold;
+            justify-content: space-around;
             color: white;
-            text-shadow: 2px 2px 0 #000;
+            text-shadow: 2px 2px #000;
             z-index: 10;
+            font-size: 20px;
             pointer-events: none;
         }
 
-        /* PANTALLAS (Inicio / Victoria / Game Over) */
         #overlay {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.85);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -47,61 +40,48 @@
             color: white;
             z-index: 100;
             text-align: center;
-            padding: 20px;
-            box-sizing: border-box;
         }
-        
-        h1 { font-size: 45px; margin: 0 0 15px 0; color: #FFD700; text-shadow: 3px 3px #000; }
-        p { font-size: 20px; color: #eee; margin-bottom: 30px; line-height: 1.4; }
-        
-        .btn-action {
-            padding: 15px 50px;
-            font-size: 24px;
-            background: #FF5722;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 5px #bf360c;
-            font-weight: bold;
-        }
-        .btn-action:active { transform: translateY(4px); box-shadow: 0 0 #bf360c; }
 
-        /* CONTROLES (AJUSTADOS PARA NO MOLESTAR) */
+        .btn-action {
+            padding: 20px 60px;
+            font-size: 28px;
+            background: #FFD700;
+            color: #333;
+            border: none;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 6px #b8860b;
+        }
+
+        /* CONTROLES ELEVADOS PARA EVITAR GESTOS DEL SISTEMA */
         #controls {
             position: absolute;
-            /* Subimos los controles para evitar gestos del sistema */
-            bottom: 100px; 
+            bottom: 120px; /* Bien arriba de la barra de inicio */
             width: 100%;
             display: flex;
             justify-content: space-between;
-            /* Separación lateral para comodidad */
-            padding: 0 50px; 
+            padding: 0 40px;
             box-sizing: border-box;
-            pointer-events: none; 
             z-index: 20;
         }
 
         .touch-btn {
-            width: 85px;
-            height: 85px;
-            background: rgba(255, 255, 255, 0.25); /* Un poco más sutiles */
-            border: 3px solid rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 4px solid white;
+            border-radius: 20px;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 45px;
-            pointer-events: auto; /* Solo los botones reciben el toque */
-            user-select: none;
+            font-size: 40px;
             color: white;
-            /* Efecto pulsación */
-            transition: background 0.1s;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-        
-        .touch-btn:active { background: rgba(255,255,255,0.5); transform: scale(0.95); }
-        
-        canvas { display: block; width: 100%; height: 100%; }
+
+        canvas { display: block; }
     </style>
 </head>
 <body>
@@ -113,11 +93,11 @@
     </div>
 
     <div id="overlay">
-        <h1 id="title">🍩 NIVEL 1 🍩</h1>
+        <h1 id="title">NIVEL 1</h1>
         <div id="message">
-            <p>Atrapa 15 donas para ganar.<br>¡Evita la comida sana!</p>
+            <p>¡Atrapa 15 donas!<br>Esquiva la chatarra del garaje.</p>
         </div>
-        <button class="btn-action" id="mainBtn" onclick="startGame()">JUGAR</button>
+        <button class="btn-action" id="mainBtn">¡EMPEZAR!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -134,219 +114,124 @@
     const scoreEl = document.getElementById('score');
     const livesEl = document.getElementById('lives');
     const overlay = document.getElementById('overlay');
-    const title = document.getElementById('title');
-    const message = document.getElementById('message');
     const mainBtn = document.getElementById('mainBtn');
 
-    let animationId;
     let isPlaying = false;
     let score = 0;
     let lives = 3;
     let frameCount = 0;
-    
-    // Configuración del Jugador
-    const player = {
-        x: 0,
-        y: 0,
-        width: 80,
-        height: 100,
-        speed: 8, // Un poco más rápido por defecto
-        emoji: "👨‍🦲",
-        isPowerUp: false
-    };
-
-    // Objetos (Items)
     let items = [];
-    
-    // Lista de enemigos (Comida sana variada)
-    const badItems = ['🥦', '🥕', '🍅', '🍆', '🥒', '🥗'];
-
-    // Controles
     let keys = { left: false, right: false };
 
-    // Ajustar pantalla
+    const player = { x: 0, y: 0, w: 70, h: 90, speed: 9, emoji: "👨‍🦲" };
+    const obstacles = ['💿', '📦', '🛞', '🥫', '👢', '🚲']; // Chatarra: CD, Caja, Neumático, Lata, Bota, Bici
+
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        player.y = canvas.height - player.height - 20; 
-        // Mantener posición relativa o centrar si acaba de iniciar
-        if(!isPlaying) player.x = canvas.width / 2 - player.width / 2;
-        else {
-            // Asegurar que no quede fuera al redimensionar
-            if(player.x > canvas.width - player.width) player.x = canvas.width - player.width;
-        }
+        player.y = canvas.height - player.h - 30;
+        player.x = canvas.width / 2 - player.w / 2;
     }
+
     window.addEventListener('resize', resize);
     resize();
 
-    // Iniciar
-    function startGame() {
-        items = [];
-        score = 0;
-        lives = 3;
-        player.isPowerUp = false;
-        player.speed = 8;
-        player.x = canvas.width / 2 - player.width / 2;
-        
-        scoreEl.innerText = score;
-        livesEl.innerText = lives;
-        
-        isPlaying = true;
-        overlay.style.display = 'none';
-        
-        cancelAnimationFrame(animationId);
-        loop();
-    }
-
-    // Ganaste Nivel
-    function winLevel() {
-        isPlaying = false;
-        overlay.style.display = 'flex';
-        title.innerText = "¡EXCELENTE!";
-        title.style.color = "#4CAF50"; // Verde victoria
-        message.innerHTML = "<p>¡Comiste 15 donas!<br>Nivel 1 Completado.</p>";
-        mainBtn.innerText = "SIGUIENTE NIVEL";
-        mainBtn.onclick = function() {
-            alert("¡Aquí cargaría el Nivel 2! (Próximamente)");
-            // Aquí pondremos la lógica para cargar el otro HTML del Nivel 2
-            location.reload(); // Por ahora reinicia
-        };
-    }
-
-    // Perdiste
-    function gameOver() {
-        isPlaying = false;
-        overlay.style.display = 'flex';
-        title.innerText = "¡D'OH!";
-        title.style.color = "#F44336"; // Rojo derrota
-        message.innerHTML = `<p>Te obligaron a hacer dieta.<br>Solo comiste ${score} donas.</p>`;
-        mainBtn.innerText = "REINTENTAR";
-        mainBtn.onclick = startGame;
-    }
-
-    // Crear Objetos
     function spawnItem() {
-        const typeRoll = Math.random();
+        const rand = Math.random();
         let type, emoji, speed;
 
-        // Probabilidades: 
-        // 10% Sándwich (PowerUp)
-        // 40% Enemigos variados
-        // 50% Dona
-
-        if (typeRoll < 0.1) {
-            type = 'sandwich';
-            emoji = '🥪';
-            speed = 8; 
-        } else if (typeRoll < 0.5) {
-            type = 'bad';
-            // Elegir verdura al azar
-            emoji = badItems[Math.floor(Math.random() * badItems.length)];
-            speed = 5 + (Math.random() * 2); // Velocidad variable
-        } else {
-            type = 'donut';
-            emoji = '🍩';
-            speed = 4 + (Math.random() * 2);
+        if (rand < 0.1) { // 10% Sándwich
+            type = 'power'; emoji = '🥪'; speed = 7;
+        } else if (rand < 0.5) { // 40% Chatarra
+            type = 'bad'; 
+            emoji = obstacles[Math.floor(Math.random() * obstacles.length)];
+            speed = 4 + Math.random() * 4;
+        } else { // 50% Donas
+            type = 'good'; emoji = '🍩'; speed = 4 + Math.random() * 3;
         }
 
-        const size = 50;
-        const x = Math.random() * (canvas.width - size);
-        
-        items.push({ x, y: -60, size, type, emoji, speed });
+        items.push({ x: Math.random() * (canvas.width - 50), y: -50, size: 50, type, emoji, speed });
     }
 
-    // Bucle del Juego
-    function loop() {
+    function update() {
         if (!isPlaying) return;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // 1. Fondo (Césped)
-        ctx.fillStyle = "#4CAF50";
-        ctx.fillRect(0, canvas.height - 25, canvas.width, 25);
-
-        // 2. Jugador
         if (keys.left && player.x > 0) player.x -= player.speed;
-        if (keys.right && player.x < canvas.width - player.width) player.x += player.speed;
+        if (keys.right && player.x < canvas.width - player.w) player.x += player.speed;
 
-        // Aura de PowerUp
-        if(player.isPowerUp) {
-            ctx.beginPath();
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.4)';
-            ctx.arc(player.x + player.width/2, player.y + player.height/2, 60, 0, Math.PI*2);
-            ctx.fill();
-        }
-
-        ctx.font = `${player.height}px Arial`;
-        ctx.fillText(player.emoji, player.x, player.y + player.height - 10);
-
-        // 3. Items
-        // Generar items cada ~0.8 segundos (60 frames = 1 seg aprox)
-        if (frameCount % 50 === 0) spawnItem();
+        if (frameCount % 45 === 0) spawnItem();
 
         for (let i = items.length - 1; i >= 0; i--) {
-            let item = items[i];
-            item.y += item.speed;
-
-            ctx.font = `${item.size}px Arial`;
-            ctx.fillText(item.emoji, item.x, item.y + item.size);
+            let it = items[i];
+            it.y += it.speed;
 
             // Colisión
-            if (
-                player.x < item.x + item.size &&
-                player.x + player.width > item.x &&
-                player.y < item.y + item.size &&
-                player.y + player.height > item.y
-            ) {
-                // Lógica de colisión
-                if (item.type === 'donut') {
+            if (player.x < it.x + it.size && player.x + player.w > it.x &&
+                player.y < it.y + it.size && player.y + player.h > it.y) {
+                
+                if (it.type === 'good') {
                     score++;
                     scoreEl.innerText = score;
-                    // CHEQUEO DE VICTORIA
-                    if(score >= 15) {
-                        winLevel();
-                        return; // Salir del loop
-                    }
-                } else if (item.type === 'sandwich') {
-                    player.speed = 14; 
-                    player.isPowerUp = true;
-                    setTimeout(() => { player.speed = 8; player.isPowerUp = false; }, 5000);
-                } else if (item.type === 'bad') {
+                    if (score >= 15) win();
+                } else if (it.type === 'bad') {
                     lives--;
                     livesEl.innerText = lives;
-                    ctx.fillStyle = 'rgba(255,0,0,0.5)';
-                    ctx.fillRect(0,0,canvas.width,canvas.height);
-                    if(lives <= 0) {
-                        gameOver();
-                        return;
-                    }
+                    if (lives <= 0) die();
+                } else if (it.type === 'power') {
+                    player.speed = 15;
+                    setTimeout(() => player.speed = 9, 4000);
                 }
                 items.splice(i, 1);
                 continue;
             }
 
-            if (item.y > canvas.height) items.splice(i, 1);
+            if (it.y > canvas.height) items.splice(i, 1);
         }
-
         frameCount++;
-        animationId = requestAnimationFrame(loop);
     }
 
-    // --- ENTRADAS TÁCTILES Y TECLADO ---
-    
-    // PC
-    window.addEventListener('keydown', e => {
-        if(e.key === 'ArrowLeft') keys.left = true;
-        if(e.key === 'ArrowRight') keys.right = true;
-    });
-    window.addEventListener('keyup', e => {
-        if(e.key === 'ArrowLeft') keys.left = false;
-        if(e.key === 'ArrowRight') keys.right = false;
-    });
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Suelo
+        ctx.fillStyle = "#555";
+        ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
 
-    // MÓVIL (Botones)
-    const btnLeft = document.getElementById('btnLeft');
-    const btnRight = document.getElementById('btnRight');
+        // Jugador
+        ctx.font = player.h + "px Arial";
+        ctx.fillText(player.emoji, player.x, player.y + player.h);
 
-    const setupBtn = (btn, dir) => {
-        btn
+        // Items
+        items.forEach(it => {
+            ctx.font = it.size + "px Arial";
+            ctx.fillText(it.emoji, it.x, it.y + it.size);
+        });
+
+        if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
+    }
+
+    function startGame() {
+        score = 0; lives = 3; items = []; frameCount = 0;
+        scoreEl.innerText = score; livesEl.innerText = lives;
+        overlay.style.display = "none";
+        isPlaying = true;
+        draw();
+    }
+
+    function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
+    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡GANASTE!"; }
+
+    // Eventos de botones
+    mainBtn.onclick = startGame;
+
+    const ctrl = (id, k) => {
+        const el = document.getElementById(id);
+        el.ontouchstart = (e) => { e.preventDefault(); keys[k] = true; };
+        el.ontouchend = () => keys[k] = false;
+        el.onmousedown = () => keys[k] = true;
+        el.onmouseup = () => keys[k] = false;
+    };
+    ctrl('btnLeft', 'left'); ctrl('btnRight', 'right');
+</script>
+</body>
+</html>
