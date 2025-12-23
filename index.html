@@ -5,25 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Homero: Springfield Quest</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; overflow: hidden; touch-action: none; }
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap'); /* Fuente Pixel Art */
-        canvas { display: block; image-rendering: pixelated; width: 100vw; height: 100vh; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+        
+        /* HUD Estilo Mario */
         #ui { position: absolute; top: 0; width: 100%; pointer-events: none; z-index: 100; }
         .hud { 
-            background: #D82000; /* Fondo rojo de Mario HUD */
-            color: #FFFFFF; 
-            padding: 5px 10px; 
-            border-bottom: 3px solid #6D0000;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            font-family: 'Press Start 2P', cursive;
-            font-size: 0.8em;
-            text-shadow: 2px 2px #000000;
-        }
-        .hud-item {
-            margin: 0 15px;
-            text-align: center;
+            background: #e74c3c; 
+            color: white; 
+            padding: 10px; 
+            display: flex; 
+            justify-content: space-around; 
+            font-family: monospace; 
+            font-weight: bold;
+            font-size: 1.2rem;
+            border-bottom: 4px solid #c0392b;
         }
     </style>
 </head>
@@ -31,8 +27,8 @@
 
 <div id="ui">
     <div class="hud">
-        <div class="hud-item">DONAS: <span id="puntos">000000</span></div>
-        <div class="hud-item">VIDAS: <span id="vidas">3</span></div>
+        <span>DONAS: <span id="puntos">000000</span></span>
+        <span>VIDAS: <span id="vidas">3</span></span>
     </div>
 </div>
 
@@ -41,81 +37,238 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let nivel = 1, puntos = 0, frame = 0, items = [], pellets = [], enemigos = [];
-let camX = 0; // Cámara para el nivel 4 (desplazamiento lateral)
-let vidas = 3;
 
-// Jugador con físicas de salto y movimiento lateral
-let jugador = { 
-    x: 50, y: 0, w: 32, h: 48, // Ajustado a tamaño de pixel art
-    vy: 0, saltos: 0, enSuelo: false, 
-    d: 'parado', proximaD: '', // Nivel 3
-    targetX: 0, targetY: 0, // Nivel 2
-    dirX: 0 // -1 izquierda, 0 parado, 1 derecha (Nivel 4)
+// Variables de estado
+let nivel = 1;
+let puntos = 0;
+let vidas = 3;
+let frame = 0;
+let items = [];
+let enemigos = [];
+let camX = 0;
+
+// Configuración de Homero
+let jugador = {
+    x: 50, y: 0, w: 40, h: 60,
+    vy: 0, saltos: 0, dirX: 0,
+    velocidad: 5
 };
 
-// --- MAPAS Y OBJETOS GLOBALES ---
+// --- CONTROLES (VELOCIDAD FIJA) ---
+let tStartX = 0;
+window.addEventListener('touchstart', e => {
+    tStartX = e.touches[0].clientX;
+    // Salto
+    if (jugador.saltos < 2) {
+        jugador.vy = -12;
+        jugador.saltos++;
+    }
+});
 
-// MAPA COMPLETO NIVEL 3 (PACMAN) - Restablecido
-const mapaReal = [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
-    [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,0,1],
-    [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
-    [1,1,1,1,0,1,1,1,2,1,2,1,1,1,0,1,1,1,1],
-    [1,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,1],
-    [1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
-    [1,0,0,0,0,2,2,2,2,2,2,2,2,2,0,0,0,0,1],
-    [1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
-    [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
-    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
-    [1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1],
-    [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
-    [1,0,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-];
+window.addEventListener('touchmove', e => {
+    e.preventDefault();
+    let dx = e.touches[0].clientX - tStartX;
+    // Movimiento lateral sin aceleración
+    if (dx > 30) jugador.dirX = 1;
+    else if (dx < -30) jugador.dirX = -1;
+    else jugador.dirX = 0;
+}, {passive: false});
 
-// MAPA DEL NIVEL 4 (Super Mario Bros. Style)
-const nivel4Mapa = [
-    "..................................................................................",
-    "..................................................................................",
-    "............................?.....................................................",
-    ".......................................................TTTTTTTTTTTTTTTTT......",
-    "..................................................................................",
-    "C..CCC...............................................?...........................",
-    "C............?...?................................................................",
-    "..................................................................................",
-    "..................................................................................",
-    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
-];
+window.addEventListener('touchend', () => {
+    jugador.dirX = 0;
+});
 
-// TILE_SIZE: Tamaño de cada 'cuadrado' en el juego (escalado para pantalla)
-let TILE_SIZE = 32; 
-let TW_N3, TH_N3; // Tamaños para Nivel 3
+// --- LÓGICA DE NIVELES ---
 
-function resize() { 
-    canvas.width = window.innerWidth; 
-    canvas.height = window.innerHeight;
-    // Ajustar TILE_SIZE para nivel 4, puede ser más grande en pantallas grandes
-    TILE_SIZE = Math.floor(canvas.height / nivel4Mapa.length); 
-    if (TILE_SIZE < 32) TILE_SIZE = 32; // Mínimo
-    if (TILE_SIZE > 64) TILE_SIZE = 64; // Máximo
+function prepararNivel() {
+    items = [];
+    enemigos = [];
+    frame = 0;
+    camX = 0;
+    jugador.vy = 0;
+    jugador.saltos = 0;
+    
+    document.getElementById('vidas').innerText = vidas;
 
-    TW_N3 = canvas.width / 19; 
-    TH_N3 = (canvas.height * 0.85) / mapaReal.length;
+    if (nivel === 1) {
+        jugador.x = 50;
+        jugador.y = canvas.height - 120;
+    } else if (nivel === 4) {
+        jugador.x = 100;
+        // Generar algunas donas y Flanders en el camino largo
+        for(let i=0; i<20; i++) {
+            items.push({x: 600 + (i * 400), y: canvas.height - 200, t: 'd'});
+            if(i % 3 === 0) enemigos.push({x: 800 + (i * 400), y: canvas.height - 100});
+        }
+    }
 }
-window.addEventListener('resize', resize); resize();
 
-// --- CONTROLES UNIVERSALES (VELOCIDAD FIJA) ---
-let touchStartX = 0;
-let touchDirection = 0; // -1: izquierda, 0: parado, 1: derecha
+function sumarPunto() {
+    puntos++;
+    document.getElementById('puntos').innerText = String(puntos).padStart(6, '0');
+    if (nivel < 4 && puntos >= 10) {
+        nivel++;
+        puntos = 0;
+        prepararNivel();
+    }
+}
 
-canvas.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-    // Solo salta si no está en medio de un movimiento horizontal activo
-    if (jugador.dirX === 0 && (nivel === 1 || nivel === 4) && jugador.saltos < 2) {
-        jugador.vy = -TILE_SIZE * 0.7; // Salto más potente
+function morir() {
+    vidas--;
+    if (vidas <= 0) {
+        alert("GAME OVER");
+        nivel = 1;
+        vidas = 3;
+    }
+    puntos = 0;
+    prepararNivel();
+}
+
+// --- MOTORES GRÁFICOS ---
+
+function dibujarSueloMario(xOffset) {
+    let size = 40;
+    ctx.fillStyle = "#d35400"; // Color ladrillo
+    for (let i = 0; i < canvas.width + size; i += size) {
+        let drawX = (i - (xOffset % size));
+        ctx.fillRect(drawX, canvas.height - size, size - 2, size - 2);
+    }
+}
+
+function motorNivel1() {
+    // Fondo Desierto
+    ctx.fillStyle = "#f1c40f"; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Gravedad
+    jugador.vy += 0.8;
+    jugador.y += jugador.vy;
+    if (jugador.y > canvas.height - 100) {
+        jugador.y = canvas.height - 100;
+        jugador.vy = 0;
+        jugador.saltos = 0;
+    }
+
+    // Generar obstáculos
+    if (frame % 100 === 0) items.push({x: canvas.width, y: canvas.height - 100, t: 'c'});
+    
+    // Dibujar y mover items
+    items.forEach((it, i) => {
+        it.x -= 6; 
+        ctx.font = "40px Arial";
+        ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
+        
+        // Colisión
+        if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) {
+            if (it.t === 'c') morir();
+            else { items.splice(i, 1); sumarPunto(); }
+        }
+    });
+
+    // Homero
+    ctx.font = "50px Arial";
+    ctx.fillText("👨‍🦲", jugador.x, jugador.y);
+}
+
+function motorNivel4() {
+    // Cielo Mario
+    ctx.fillStyle = "#5c94fc"; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Movimiento y Cámara
+    jugador.x += jugador.dirX * jugador.velocidad;
+    camX = jugador.x - 100;
+
+    // Gravedad
+    jugador.vy += 0.8;
+    jugador.y += jugador.vy;
+    if (jugador.y > canvas.height - 100) {
+        jugador.y = canvas.height - 100;
+        jugador.vy = 0;
+        jugador.saltos = 0;
+    }
+
+    ctx.save();
+    ctx.translate(-camX, 0);
+
+    // Dibujar Suelo Ladrillo
+    dibujarSueloMario(camX);
+
+    // Decoración (Montañas y Nubes)
+    ctx.font = "100px Arial";
+    ctx.fillText("☁️", 200, 150);
+    ctx.fillText("⛰️", 400, canvas.height - 100);
+
+    // Items y Enemigos
+    items.forEach((it, i) => {
+        ctx.font = "40px Arial";
+        ctx.fillText("🍩", it.x, it.y);
+        if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) {
+            items.splice(i, 1);
+            sumarPunto();
+        }
+    });
+
+    enemigos.forEach(en => {
+        ctx.font = "45px Arial";
+        ctx.fillText("👨‍🏫", en.x, en.y); // Flanders
+        if (Math.hypot(jugador.x - en.x, jugador.y - en.y) < 40) morir();
+    });
+
+    // Meta final (Casa de Homero)
+    let metaX = 5000;
+    ctx.font = "150px Arial";
+    ctx.fillText("🏠", metaX, canvas.height - 100);
+    ctx.font = "50px Arial";
+    ctx.fillText("👩‍🦱", metaX + 160, canvas.height - 60); // Marge esperándolo
+
+    if (jugador.x > metaX + 100) {
+        alert("¡GANASTE! Llegaste a casa.");
+        nivel = 1;
+        prepararNivel();
+    }
+
+    ctx.restore();
+
+    // Homero fijo en relación a la cámara
+    ctx.font = "50px Arial";
+    ctx.fillText("👨‍🦲", 100, jugador.y);
+}
+
+// Bucle principal
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
+
+    if (nivel === 1) motorNivel1();
+    else if (nivel === 4) motorNivel4();
+    else {
+        // Pantalla de carga para niveles intermedios (2 y 3)
+        ctx.fillStyle = "black";
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.fillText("NIVEL " + nivel + " - Pulsa para avanzar", canvas.width/2, canvas.height/2);
+    }
+
+    requestAnimationFrame(loop);
+}
+
+// Iniciar
+window.onload = () => {
+    resize();
+    prepararNivel();
+    loop();
+};
+
+// Si haces clic en la pantalla de carga, avanza de nivel
+window.addEventListener('click', () => {
+    if (nivel > 1 && nivel < 4) {
+        nivel++;
+        prepararNivel();
+    }
+});
+
+</script>
+</body>
+</html>
