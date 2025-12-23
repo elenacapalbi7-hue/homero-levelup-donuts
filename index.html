@@ -3,42 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Runner - Pro Level 2</title>
+    <title>Homer Runner: Springfield Pro</title>
     <style>
-        body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; overflow: hidden; }
-        
-        #ui {
-            position: absolute; top: 15px; width: 100%;
-            display: flex; justify-content: space-around;
-            color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 18px;
-        }
-
-        #overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
-            justify-content: center; align-items: center; color: white; z-index: 100; text-align: center;
-        }
-
-        .btn-action {
-            padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333;
-            border: none; border-radius: 12px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 6px #b8860b;
-        }
-
-        #controls {
-            position: absolute; bottom: 130px; width: 100%;
-            display: flex; justify-content: center; z-index: 20;
-        }
-
-        .jump-btn {
-            width: 100px; height: 100px; background: rgba(255, 255, 255, 0.3);
-            border: 4px solid white; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 45px; color: white; user-select: none;
-        }
-
-        canvas { display: block; }
+        #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 18px; pointer-events: none; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
+        .btn-action { padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        #controls { position: absolute; bottom: 120px; width: 100%; display: flex; justify-content: center; z-index: 20; }
+        .jump-btn { width: 100px; height: 100px; background: rgba(255, 255, 255, 0.3); border: 4px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 45px; color: white; }
     </style>
 </head>
 <body>
@@ -52,15 +25,13 @@
 
     <div id="overlay">
         <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Corre a la Planta Nuclear!<br>Usa el doble salto para grupos de objetos.</p>
-        <button class="btn-action" id="mainBtn">¡EMPEZAR!</button>
+        <p id="msg">¡Usa las PLATAFORMAS!<br>Doble salto para llegar arriba.</p>
+        <button class="btn-action" onclick="startGame()">¡EMPEZAR!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
-    <div id="controls">
-        <div class="jump-btn" id="btnJump">⬆️</div>
-    </div>
+    <div id="controls"><div class="jump-btn" id="btnJump">⬆️</div></div>
 </div>
 
 <script>
@@ -70,67 +41,45 @@
     const donutsEl = document.getElementById('donuts');
     const livesEl = document.getElementById('lives');
     const overlay = document.getElementById('overlay');
-    const mainBtn = document.getElementById('mainBtn');
 
-    let isPlaying = false;
-    let scoreClocks = 0;
-    let scoreDonuts = 0;
-    let lives = 3;
-    let frameCount = 0;
-    let items = [];
-    let scenery = []; // Nubes y arbustos
-    let gameSpeed = 6;
+    let isPlaying = false, scoreClocks = 0, scoreDonuts = 0, lives = 3, frameCount = 0;
+    let platforms = [], items = [], gameSpeed = 5;
 
-    const player = {
-        x: 60, y: 0, w: 70, h: 90,
-        vy: 0, gravity: 0.8, jumpPower: -15,
-        jumps: 0, maxJumps: 2,
-        emoji: "🏃‍♂️"
-    };
+    const player = { x: 80, y: 0, w: 60, h: 80, vy: 0, gravity: 0.7, jumpPower: -14, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
 
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        player.y = canvas.height - player.h - 50;
     }
     window.addEventListener('resize', resize);
     resize();
 
-    // Crear nubes y arbustos decorativos
-    function initScenery() {
-        scenery = [];
-        for(let i=0; i<5; i++) {
-            scenery.push({ x: Math.random()*canvas.width, y: 50+Math.random()*100, s: 0.5+Math.random(), e: '☁️' });
-            scenery.push({ x: Math.random()*canvas.width, y: canvas.height-90, s: gameSpeed, e: '🌳' });
-        }
-    }
-
-    function spawn() {
-        const typeRoll = Math.random();
+    // Generador de obstáculos y plataformas
+    function spawnWorld() {
         let xPos = canvas.width + 50;
-        
-        // RELOJES más frecuentes (cada 3-4 segundos máximo)
-        if (typeRoll < 0.25) {
-            items.push({ x: xPos, y: canvas.height - 200, size: 50, type: 'clock', emoji: '⏰' });
-        } 
-        // DONAS
-        else if (typeRoll < 0.45) {
-            items.push({ x: xPos, y: canvas.height - 150 - Math.random()*100, size: 45, type: 'donut', emoji: '🍩' });
+        let groundY = canvas.height - 60;
+
+        // 1. Siempre hay suelo base (pero con pequeños huecos a veces)
+        if (Math.random() > 0.1) {
+            platforms.push({ x: xPos, y: groundY, w: 200, h: 60, t: 'ground' });
         }
-        // OBSTÁCULOS COMPUESTOS (El "secreto" para que no sea básico)
-        else {
-            const pattern = Math.random();
-            if(pattern < 0.4) {
-                // Fila de 3 cajas
-                for(let i=0; i<3; i++) items.push({ x: xPos + (i*50), y: canvas.height - 95, size: 45, type: 'bad', emoji: '📦' });
-            } else if(pattern < 0.7) {
-                // Valla con algo encima
-                items.push({ x: xPos, y: canvas.height - 95, size: 55, type: 'bad', emoji: '🚧' });
-                items.push({ x: xPos, y: canvas.height - 150, size: 40, type: 'bad', emoji: '🥫' });
-            } else {
-                // El auto de Juan Topo (rápido)
-                items.push({ x: xPos, y: canvas.height - 100, size: 65, type: 'bad', emoji: '🚗' });
-            }
+
+        // 2. PLATAFORMAS FLOTANTES (Lo que pedías para variedad)
+        if (Math.random() < 0.4) {
+            let platY = groundY - 120 - Math.random() * 80;
+            platforms.push({ x: xPos + 100, y: platY, w: 120, h: 20, t: 'platform' });
+            // Poner premio arriba de la plataforma
+            items.push({ x: xPos + 140, y: platY - 50, size: 40, t: 'donut', e: '🍩' });
+        }
+
+        // 3. OBSTÁCULOS DE DIFERENTE TIPO
+        let obstacleRoll = Math.random();
+        if (obstacleRoll < 0.3) {
+            items.push({ x: xPos + 50, y: groundY - 50, size: 50, t: 'bad', e: '🚧' });
+        } else if (obstacleRoll < 0.5) {
+            items.push({ x: xPos + 20, y: groundY - 80, size: 60, t: 'bad', e: '🚗' });
+        } else if (obstacleRoll < 0.8) {
+            items.push({ x: xPos, y: groundY - 40, size: 40, t: 'clock', e: '⏰' });
         }
     }
 
@@ -139,102 +88,79 @@
 
         player.vy += player.gravity;
         player.y += player.vy;
-        const groundY = canvas.height - player.h - 50;
+        let onAnyGround = false;
 
-        if (player.y > groundY) {
-            player.y = groundY;
-            player.vy = 0;
-            player.jumps = 0;
-        }
-
-        // Mover Escenario
-        scenery.forEach(s => {
-            s.x -= s.s;
-            if(s.x < -100) s.x = canvas.width + 100;
+        // Colisión con Plataformas y Suelo
+        platforms.forEach(p => {
+            p.x -= gameSpeed;
+            if (player.x + player.w > p.x && player.x < p.x + p.w &&
+                player.y + player.h > p.y && player.y + player.h < p.y + player.vy + 10 && player.vy >= 0) {
+                player.y = p.y - player.h;
+                player.vy = 0;
+                player.jumps = 0;
+                onAnyGround = true;
+            }
         });
 
-        // Spawn cada 70 frames aprox (más rápido)
-        if (frameCount % 75 === 0) spawn();
-
+        // Items y Obstáculos
         for (let i = items.length - 1; i >= 0; i--) {
             let it = items[i];
             it.x -= gameSpeed;
-
-            // Colisión
-            if (player.x < it.x + it.size - 15 && player.x + player.w - 15 > it.x &&
-                player.y < it.y + it.size - 15 && player.y + player.h > it.y) {
-                
-                if (it.type === 'clock') {
-                    scoreClocks++;
-                    clocksEl.innerText = scoreClocks;
-                    if (scoreClocks >= 10) win();
-                } else if (it.type === 'donut') {
-                    scoreDonuts++;
-                    donutsEl.innerText = scoreDonuts;
-                } else {
-                    lives--;
-                    livesEl.innerText = lives;
-                    if (lives <= 0) die();
-                }
-                items.splice(i, 1);
-                continue;
+            if (player.x < it.x + it.size && player.x + player.w > it.x &&
+                player.y < it.y + it.size && player.y + player.h > it.y) {
+                if (it.t === 'clock') { scoreClocks++; clocksEl.innerText = scoreClocks; if(scoreClocks>=10) win(); }
+                else if (it.t === 'donut') { scoreDonuts++; donutsEl.innerText = scoreDonuts; }
+                else { lives--; livesEl.innerText = lives; if(lives<=0) die(); }
+                items.splice(i, 1); continue;
             }
-            if (it.x < -200) items.splice(i, 1);
+            if (it.x < -100) items.splice(i, 1);
         }
+
+        if (frameCount % 60 === 0) spawnWorld();
+        platforms = platforms.filter(p => p.x > -p.w);
+        
+        if (player.y > canvas.height) { lives--; livesEl.innerText = lives; if(lives<=0) die(); else resetPosition(); }
         frameCount++;
     }
+
+    function resetPosition() { player.y = 0; player.vy = 0; player.x = 80; }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Dibujar Escenario Parallax
-        scenery.forEach(s => {
-            ctx.font = (s.e === '☁️' ? "60px" : "40px") + " Arial";
-            ctx.fillText(s.e, s.x, s.y);
+        // Dibujar Plataformas
+        platforms.forEach(p => {
+            ctx.fillStyle = p.t === 'ground' ? "#6d4c41" : "#ffd54f";
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.strokeStyle = "#000"; ctx.strokeRect(p.x, p.y, p.w, p.h);
         });
 
-        // Calle
-        ctx.fillStyle = "#444";
-        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-        ctx.fillStyle = "white";
-        for(let i=0; i<10; i++) ctx.fillRect((i*150) - (frameCount*gameSpeed % 150), canvas.height-30, 50, 6);
+        // Dibujar Items
+        items.forEach(it => { ctx.font = it.size + "px Arial"; ctx.fillText(it.e, it.x, it.y + it.size); });
 
-        // Personaje
+        // Homero
         ctx.font = player.h + "px Arial";
         ctx.fillText(player.emoji, player.x, player.y + player.h);
-
-        // Items
-        items.forEach(it => {
-            ctx.font = it.size + "px Arial";
-            ctx.fillText(it.emoji, it.x, it.y + it.size);
-        });
 
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function startGame() {
-        scoreClocks = 0; scoreDonuts = 0; lives = 3; items = []; frameCount = 0;
+        scoreClocks = 0; scoreDonuts = 0; lives = 3; platforms = []; items = []; frameCount = 0;
         clocksEl.innerText = "0"; donutsEl.innerText = "0"; livesEl.innerText = "3";
         overlay.style.display = "none";
-        initScenery();
+        // Suelo inicial
+        platforms.push({ x: 0, y: canvas.height-60, w: canvas.width, h: 60, t: 'ground' });
         isPlaying = true;
         draw();
     }
 
     function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
-    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡EXCELENTE!"; }
+    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡GANASTE!"; }
 
-    mainBtn.onclick = startGame;
-
-    const jumpAction = () => {
-        if (isPlaying && player.jumps < player.maxJumps) {
-            player.vy = player.jumpPower;
-            player.jumps++;
-        }
-    };
-
-    document.getElementById('btnJump').ontouchstart = (e) => { e.preventDefault(); jumpAction(); };
-    window.onkeydown = (e) => { if(e.key === ' ' || e.key === 'ArrowUp') jumpAction(); };
+    const jump = () => { if (isPlaying && player.jumps < player.maxJumps) { player.vy = player.jumpPower; player.jumps++; } };
+    document.getElementById('btnJump').ontouchstart = (e) => { e.preventDefault(); jump(); };
+    window.onkeydown = (e) => { if(e.key === ' ' || e.key === 'ArrowUp') jump(); };
 </script>
 </body>
 </html>
