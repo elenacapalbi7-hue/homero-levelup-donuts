@@ -3,45 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Bros 1-1 - Controles Optimizados</title>
+    <title>Homer Adventure 1-1 Fixed</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'monospace'; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Arial', sans-serif; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; overflow: hidden; }
         canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
         
-        /* UI Superior */
-        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; font-size: 1rem; z-index: 10; pointer-events: none; }
+        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; font-size: 14px; z-index: 10; pointer-events: none; }
         
-        /* CONTROLES ELEVADOS PARA EVITAR GESTOS DEL SISTEMA */
-        #controls { 
-            position: absolute; 
-            bottom: 80px; /* Subidos 80px para no interferir con la barra de inicio/Google */
-            width: 100%; 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 0 30px; 
-            box-sizing: border-box; 
-            z-index: 20; 
-        }
+        /* Controles elevados para evitar gestos de Android/iOS */
+        #controls { position: absolute; bottom: 85px; width: 100%; display: flex; justify-content: space-between; padding: 0 25px; box-sizing: border-box; z-index: 20; }
+        .btn { width: 65px; height: 65px; background: rgba(255, 255, 255, 0.25); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; user-select: none; }
         
-        .btn { 
-            width: 60px; 
-            height: 60px; 
-            background: rgba(255, 255, 255, 0.2); /* Más transparentes para no molestar la vista */
-            border: 2px solid rgba(255, 255, 255, 0.5); 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 25px; 
-            color: white; 
-            user-select: none; 
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        .btn:active { background: rgba(255, 255, 255, 0.4); }
-
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; flex-direction: column; justify-content: center; align-items: center; color: yellow; z-index: 100; text-align: center; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; flex-direction: column; justify-content: center; align-items: center; color: yellow; z-index: 100; text-align: center; }
     </style>
 </head>
 <body>
@@ -55,8 +29,8 @@
     </div>
     
     <div id="overlay">
-        <h1 id="msg-title"></h1>
-        <p>TOCA PARA REINTENTAR</p>
+        <h1 id="msg-title">D'OH!</h1>
+        <p>TOCA AQUÍ PARA REINTENTAR</p>
     </div>
 
     <div id="controls">
@@ -64,104 +38,174 @@
             <div class="btn" id="left">⬅️</div>
             <div class="btn" id="right">➡️</div>
         </div>
-        <div class="btn" id="jump">A</div>
+        <div class="btn" id="jump">JUMP</div>
     </div>
     <canvas id="canvas"></canvas>
 </div>
 
 <script>
-// ... (Toda la lógica del mapa 1-1 y física permanece igual para mantener la réplica exacta) ...
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const GRID = 40; 
+const GRID = 40;
 
-let camX = 0, score = 0, coins = 0, timeLeft = 400, active = true, frameCount = 0;
+let camX = 0, coins = 0, timeLeft = 400, active = true, frameCount = 0;
 let blocks = [], enemies = [], items = [];
 let keys = { left: false, right: false };
 
-const p = { x: 80, y: 0, w: 34, h: 38, vx: 0, vy: 0, ground: false };
+const p = { x: 100, y: 0, w: 32, h: 45, vx: 0, vy: 0, ground: false };
 
-function init() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+function buildMap() {
+    blocks = []; enemies = []; items = [];
     const gY = canvas.height - 80;
-    p.y = gY - p.h;
+    p.y = gY - 100;
 
-    // Generación de suelo original (con sus huecos)
-    for(let i=0; i<200; i++) {
+    // 1. Suelo original con sus 3 huecos exactos
+    for(let i=0; i<220; i++) {
         if(!([69, 70, 86, 87, 88, 153, 154].includes(i))) {
             blocks.push({x: i*GRID, y: gY, w: GRID, h: GRID, t: 'G'});
         }
     }
 
-    // Mapeo simplificado para esta demo (Réplica 1-1 NES)
-    const levelMap = [
-        [16, 9, '?'], [20, 9, 'B'], [21, 9, '?'], [22, 9, 'B'], [23, 9, '?'],
+    // 2. Elementos del nivel (Réplica 1-1)
+    const levelItems = [
+        // Bloques interrogación y Ladrillos iniciales
+        [16, 9, '?'], [20, 9, 'B'], [21, 9, '?'], [22, 9, 'B'], [23, 9, '?'], [22, 5, '?'],
+        // Tuberías
         [28, 12, 'P', 2], [38, 12, 'P', 3], [46, 12, 'P', 4], [57, 12, 'P', 4],
-        [163, 12, 'FLAG']
+        // Bloques después de tuberías
+        [77, 9, 'B'], [78, 9, '?'], [79, 9, 'B'],
+        // Escalera final
+        [134, 12, 'S', 1], [135, 12, 'S', 2], [136, 12, 'S', 3], [137, 12, 'S', 4],
+        [140, 12, 'S', 4], [141, 12, 'S', 3], [142, 12, 'S', 2], [143, 12, 'S', 1],
+        // Mástil
+        [160, 12, 'FLAG']
     ];
 
-    levelMap.forEach(m => {
+    levelItems.forEach(m => {
         let bx = m[0] * GRID;
-        if(m[2] === 'P') {
+        if(m[2] === 'P') { // Tuberías
             for(let h=0; h<m[3]; h++) blocks.push({x: bx, y: gY - ((h+1)*GRID), w: GRID*2, h: GRID, t: 'P'});
-        } else {
+        } else if(m[2] === 'S') { // Escaleras
+            for(let h=0; h<m[3]; h++) blocks.push({x: bx, y: gY - ((h+1)*GRID), w: GRID, h: GRID, t: 'S'});
+        } else if(m[2] === 'FLAG') { // Bandera
+            blocks.push({x: bx, y: gY - (GRID*8), w: 10, h: GRID*8, t: 'FLAG'});
+        } else { // Bloques
             let by = gY - ((13 - m[1]) * GRID);
             blocks.push({x: bx, y: by, w: GRID, h: GRID, t: m[2]});
         }
     });
 
-    loop();
+    // 3. Enemigos (Flanders)
+    [22, 40, 51, 80, 97, 114].forEach(ex => {
+        enemies.push({x: ex*GRID, y: gY - GRID, vx: -1.5, w: 35, h: 35});
+    });
 }
 
 function update() {
     if(!active) return;
-    if (keys.left) p.vx -= 0.5; else if (keys.right) p.vx += 0.5; else p.vx *= 0.85;
-    p.vx = Math.max(-5, Math.min(5, p.vx));
-    p.vy += 0.9; p.x += p.vx; p.y += p.vy;
-    if(p.x > camX + 150) camX = p.x - 150;
 
+    // Movimiento
+    if (keys.left) p.vx = -4.5;
+    else if (keys.right) p.vx = 4.5;
+    else p.vx *= 0.8;
+
+    p.vy += 0.8;
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Cámara
+    if(p.x > camX + (canvas.width/3)) camX = p.x - (canvas.width/3);
+    if(camX < 0) camX = 0;
+
+    // Colisiones
     p.ground = false;
     blocks.forEach(b => {
         if (p.x + p.w > b.x && p.x < b.x + b.w && p.y + p.h > b.y && p.y < b.y + b.h) {
-            if(b.t === 'FLAG') win();
-            if (p.vy > 0 && p.y + p.h - p.vy <= b.y) { p.y = b.y - p.h; p.vy = 0; p.ground = true; }
-            else if (p.vx > 0) p.x = b.x - p.w; else if (p.vx < 0) p.x = b.x + b.w;
+            if(b.t === 'FLAG') { active = false; document.getElementById('overlay').style.display="flex"; document.getElementById('msg-title').innerText="¡EXCELENTE!"; }
+            if (p.vy > 0 && p.y + p.h - p.vy <= b.y) {
+                p.y = b.y - p.h; p.vy = 0; p.ground = true;
+            } else if (p.vx > 0 && p.x < b.x) p.x = b.x - p.w;
+            else if (p.vx < 0 && p.x > b.x) p.x = b.x + b.w;
         }
     });
 
-    if(p.y > canvas.height) die();
-    frameCount++; if(frameCount % 60 === 0) timeLeft--;
+    // Muerte por caída o Flanders
+    if(p.y > canvas.height) resetGame();
+    enemies.forEach((en, i) => {
+        en.x += en.vx;
+        if(Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 30) {
+            if(p.vy > 0) { enemies.splice(i, 1); p.vy = -10; }
+            else resetGame();
+        }
+    });
+
+    frameCount++;
+    if(frameCount % 60 === 0) {
+        timeLeft--;
+        document.getElementById('timer').innerText = timeLeft;
+    }
 }
 
-function die() { active = false; document.getElementById('overlay').style.display="flex"; document.getElementById('msg-title').innerText="D'OH!"; }
-function win() { active = false; document.getElementById('overlay').style.display="flex"; document.getElementById('msg-title').innerText="EXCELENTE!"; }
+function resetGame() {
+    active = false;
+    document.getElementById('overlay').style.display = "flex";
+}
 
 function draw() {
     ctx.clearRect(0,0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(-camX, 0);
+
     blocks.forEach(b => {
-        ctx.fillStyle = b.t==='G'?'#944828': b.t==='P'?'#27ae60': b.t==='B'?'#e76e33': '#f1c40f';
+        if(b.t==='G') ctx.fillStyle = '#944828';
+        else if(b.t==='P') ctx.fillStyle = '#27ae60';
+        else if(b.t==='B') ctx.fillStyle = '#e76e33';
+        else if(b.t==='S') ctx.fillStyle = '#bdc3c7';
+        else if(b.t==='FLAG') ctx.fillStyle = '#fff';
+        else ctx.fillStyle = '#f1c40f';
         ctx.fillRect(b.x, b.y, b.w, b.h);
         ctx.strokeRect(b.x, b.y, b.w, b.h);
     });
-    ctx.font = "38px Arial";
+
+    enemies.forEach(en => { ctx.font = "30px Arial"; ctx.fillText("👨‍🏫", en.x, en.y + 30); });
+
+    // Homero
+    ctx.font = "40px Arial";
     ctx.fillText("👨‍🦲", p.x, p.y + p.h);
+
     ctx.restore();
-    document.getElementById('timer').innerText = timeLeft;
 }
 
-const ctrl = (id, k) => {
+function loop() {
+    update();
+    draw();
+    if(active) requestAnimationFrame(loop);
+}
+
+// Controles
+const setupControl = (id, key) => {
     const el = document.getElementById(id);
-    el.ontouchstart = (e) => { e.preventDefault(); if(k==='j') { if(p.ground) p.vy=-18; } else keys[k]=true; };
-    el.ontouchend = () => { if(k!=='j') keys[k]=false; };
+    el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if(key === 'j') { if(p.ground) p.vy = -16; }
+        else keys[key] = true;
+    });
+    el.addEventListener('touchend', () => { if(key !== 'j') keys[key] = false; });
 };
-ctrl('left', 'left'); ctrl('right', 'right'); ctrl('jump', 'j');
 
-document.getElementById('overlay').onclick = () => location.reload();
+setupControl('left', 'left');
+setupControl('right', 'right');
+setupControl('jump', 'j');
 
-init();
+document.getElementById('overlay').addEventListener('click', () => location.reload());
+
+// Iniciar al cargar
+window.onload = () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    buildMap();
+    loop();
+};
 </script>
 </body>
 </html>
