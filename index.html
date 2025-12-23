@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homero Simpson Quest</title>
+    <title>Homer: Springfield World</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        body { margin: 0; background: #5c94fc; overflow: hidden; touch-action: none; font-family: 'Courier New', Courier, monospace; }
         #ui { position: absolute; top: 0; width: 100%; z-index: 10; pointer-events: none; }
         .hud { 
             background: #e74c3c; color: white; padding: 10px; 
             display: flex; justify-content: space-around; 
-            font-family: monospace; font-size: 1.2rem; font-weight: bold;
-            border-bottom: 4px solid #c0392b;
+            font-size: 1.2rem; font-weight: bold; border-bottom: 4px solid #c0392b;
         }
         canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
     </style>
@@ -31,201 +30,169 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-// ESTADO DEL JUEGO
-let nivel = 1;
-let puntos = 0;
-let vidas = 3;
-let frame = 0;
-let items = [];
-let enemigos = [];
-let camX = 0;
+let nivel = 1, puntos = 0, vidas = 3, frame = 0, camX = 0;
+let items = [], enemigos = [], particulas = [], bloques = [];
 
-let jugador = {
-    x: 50, y: 0, w: 40, h: 60,
-    vy: 0, saltos: 0, dirX: 0
+// Configuración de Homero (Mario style)
+let h = {
+    x: 100, y: 0, w: 32, h: 48,
+    vx: 0, vy: 0, 
+    saltoForza: -15, gravedad: 0.8,
+    enSuelo: false, saltos: 0,
+    dir: 0 // -1 izq, 1 der
 };
 
-// --- AJUSTE DE PANTALLA ---
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    if (frame === 0) prepararNivel(); // Solo prepara si es el inicio
+    iniciarNivel();
 }
-window.addEventListener('resize', resize);
 
-// --- CONTROLES ---
-let tStartX = 0;
+// --- CONTROLES FIJOS ---
 window.addEventListener('touchstart', e => {
-    tStartX = e.touches[0].clientX;
-    if (jugador.saltos < 2) { jugador.vy = -12; jugador.saltos++; }
+    const touchX = e.touches[0].clientX;
+    if (touchX > window.innerWidth / 2) h.dir = 1;
+    else h.dir = -1;
+    
+    if (h.saltos < 2) {
+        h.vy = h.saltoForza;
+        h.saltos++;
+    }
 });
+window.addEventListener('touchend', () => h.dir = 0);
 
-window.addEventListener('touchmove', e => {
-    e.preventDefault();
-    let dx = e.touches[0].clientX - tStartX;
-    if (dx > 30) jugador.dirX = 1;
-    else if (dx < -30) jugador.dirX = -1;
-    else jugador.dirX = 0;
-}, {passive: false});
-
-window.addEventListener('touchend', () => { jugador.dirX = 0; });
-
-// --- LÓGICA ---
-function prepararNivel() {
-    items = []; enemigos = []; frame = 1; camX = 0;
-    jugador.vy = 0; jugador.saltos = 0;
-    document.getElementById('vidas').innerText = vidas;
+function iniciarNivel() {
+    items = []; enemigos = []; bloques = []; camX = 0;
+    h.vx = 0; h.vy = 0; h.x = 100; h.y = canvas.height - 150;
     
-    if (nivel === 1) { // DESIERTO
-        jugador.x = 80;
-        jugador.y = canvas.height - 150;
-    } else if (nivel === 4) { // MARIO STYLE
-        jugador.x = 100;
-        // Generar mundo largo
-        for(let i=0; i<30; i++) {
-            items.push({x: 500 + (i*400), y: canvas.height - 220, t:'d'});
-            if(i % 4 === 0) enemigos.push({x: 800 + (i*400), y: canvas.height - 110});
-        }
-    }
-}
-
-function morir() {
-    vidas--;
-    if (vidas <= 0) { alert("GAME OVER"); nivel = 1; vidas = 3; }
-    puntos = 0;
-    document.getElementById('puntos').innerText = "000000";
-    prepararNivel();
-}
-
-function sumarPunto() {
-    puntos++;
-    document.getElementById('puntos').innerText = String(puntos).padStart(6, '0');
-    if (nivel < 4 && puntos >= 10) {
-        nivel++; puntos = 0;
-        alert("¡SIGUIENTE NIVEL!");
-        prepararNivel();
-    }
-}
-
-// --- DIBUJO ---
-function motorNivel1() {
-    ctx.fillStyle = "#f1c40f"; // Color arena
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (nivel === 1) { /* Cactus */ }
+    if (nivel === 2) { for(let i=0; i<5; i++) enemigos.push({x: 500+i*300, y: canvas.height-100, t:'z'}); }
+    if (nivel === 3) { /* Pacman Logic */ }
     
-    // Suelo
-    ctx.fillStyle = "#d35400";
-    ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-
-    // Gravedad Homero
-    jugador.vy += 0.8;
-    jugador.y += jugador.vy;
-    if (jugador.y > canvas.height - 110) {
-        jugador.y = canvas.height - 110;
-        jugador.vy = 0;
-        jugador.saltos = 0;
-    }
-
-    if (frame % 90 === 0) items.push({x: canvas.width, y: canvas.height - 100, t: 'c'});
-    if (frame % 150 === 0) items.push({x: canvas.width, y: canvas.height - 250, t: 'd'});
-
-    items.forEach((it, i) => {
-        it.x -= 6;
-        ctx.font = "40px Arial";
-        ctx.fillText(it.t === 'c' ? "🌵" : "🍩", it.x, it.y);
-        if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) {
-            if (it.t === 'c') morir();
-            else { items.splice(i, 1); sumarPunto(); }
+    if (nivel === 4) {
+        // Generar Suelo y Bloques como en la imagen de Mario
+        for(let i=0; i<100; i++) {
+            // Suelo de ladrillo
+            bloques.push({x: i*40, y: canvas.height-40, w: 40, h:40, t:'suelo'});
+            
+            // Bloques flotantes (escaleras y signos ?)
+            if(i === 10 || i === 12 || i === 14) bloques.push({x: i*40, y: canvas.height-160, w:40, h:40, t:'?'});
+            if(i === 12) bloques.push({x: i*40, y: canvas.height-280, w:40, h:40, t:'?'});
+            
+            // Ladrillos
+            if(i > 20 && i < 25) bloques.push({x: i*40, y: canvas.height-160, w:40, h:40, t:'ladrillo'});
         }
-    });
-    ctx.font = "50px Arial";
-    ctx.fillText("👨‍🦲", jugador.x, jugador.y);
+        for(let i=0; i<10; i++) enemigos.push({x: 800 + i*600, y: canvas.height-85, t:'f'});
+    }
 }
 
-function motorNivel4() {
-    ctx.fillStyle = "#5c94fc"; // Azul Mario
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    jugador.x += jugador.dirX * 5;
-    camX = jugador.x - 100;
-
-    jugador.vy += 0.8;
-    jugador.y += jugador.vy;
-    if (jugador.y > canvas.height - 110) {
-        jugador.y = canvas.height - 110;
-        jugador.vy = 0;
-        jugador.saltos = 0;
-    }
-
-    ctx.save();
-    ctx.translate(-camX, 0);
-
-    // Suelo de ladrillo (como la foto)
-    ctx.fillStyle = "#d35400";
-    for(let i=0; i<6000; i+=40) {
-        ctx.fillRect(i, canvas.height - 50, 38, 48);
-    }
-
-    // Decoración
-    ctx.font = "80px Arial";
-    ctx.fillText("☁️", 300, 150);
-    ctx.fillText("⛰️", 600, canvas.height - 100);
-
-    items.forEach((it, i) => {
-        ctx.font = "40px Arial";
-        ctx.fillText("🍩", it.x, it.y);
-        if (Math.hypot(jugador.x - it.x, jugador.y - it.y) < 40) {
-            items.splice(i, 1); sumarPunto();
-        }
-    });
-
-    enemigos.forEach(en => {
-        ctx.font = "45px Arial";
-        ctx.fillText("👨‍🏫", en.x, en.y);
-        if (Math.hypot(jugador.x - en.x, jugador.y - en.y) < 40) morir();
-    });
-
-    // Casa de Marge (Meta)
-    let metaX = 5000;
-    ctx.font = "120px Arial";
-    ctx.fillText("🏠", metaX, canvas.height - 100);
-    ctx.font = "50px Arial";
-    ctx.fillText("👩‍🦱", metaX + 150, canvas.height - 60);
-
-    if (jugador.x > metaX + 100) {
-        alert("¡Llegaste a casa con Marge!");
-        nivel = 1; prepararNivel();
-    }
-
-    ctx.restore();
-    ctx.font = "50px Arial";
-    ctx.fillText("👨‍🦲", 100, jugador.y);
-}
-
-function loop() {
-    frame++;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    if (nivel === 1) motorNivel1();
-    else if (nivel === 4) motorNivel4();
-    else {
+function dibujarBloque(b) {
+    let x = b.x - camX;
+    if (b.t === 'suelo' || b.t === 'ladrillo') {
+        ctx.fillStyle = "#e76e33"; // Color ladrillo original
+        ctx.fillRect(x, b.y, b.w, b.h);
+        ctx.strokeStyle = "black";
+        ctx.strokeRect(x, b.y, b.w, b.h);
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.fillRect(x, b.y+b.h-5, b.w, 5);
+    } else if (b.t === '?') {
+        ctx.fillStyle = "#f39c12";
+        ctx.fillRect(x, b.y, b.w, b.h);
+        ctx.strokeRect(x, b.y, b.w, b.h);
         ctx.fillStyle = "white";
-        ctx.textAlign = "center";
         ctx.font = "20px Arial";
-        ctx.fillText("NIVEL " + nivel + " - TOCA PARA CONTINUAR", canvas.width/2, canvas.height/2);
+        ctx.fillText("?", x+15, b.y+25);
     }
-    requestAnimationFrame(loop);
 }
 
-// ARRANQUE FORZADO
-window.onload = () => {
-    resize();
-    prepararNivel();
-    loop();
-};
+function motorFisicas() {
+    h.vx = h.dir * 6; // Velocidad fija
+    h.vy += h.gravedad;
+    h.x += h.vx;
+    h.y += h.vy;
+    h.enSuelo = false;
 
-window.addEventListener('click', () => {
-    if (nivel > 1 && nivel < 4) { nivel++; prepararNivel(); }
-});
+    // Colisión con bloques (Nivel 4)
+    if (nivel === 4) {
+        bloques.forEach(b => {
+            if (h.x < b.x + b.w && h.x + h.w > b.x && h.y < b.y + b.h && h.y + h.h > b.y) {
+                // Colisión arriba del bloque
+                if (h.vy > 0 && h.y + h.h - h.vy <= b.y) {
+                    h.y = b.y - h.h;
+                    h.vy = 0;
+                    h.enSuelo = true;
+                    h.saltos = 0;
+                }
+                // Colisión abajo (Golpear bloque para donas)
+                else if (h.vy < 0 && h.y - h.vy >= b.y + b.h) {
+                    h.y = b.y + b.h;
+                    h.vy = 1;
+                    if(b.t === '?') { b.t = 'ladrillo'; puntos += 10; document.getElementById('puntos').innerText = puntos.toString().padStart(6,'0'); }
+                }
+            }
+        });
+    } else {
+        // Suelo básico para niveles 1-3
+        if (h.y > canvas.height - 100) {
+            h.y = canvas.height - 100;
+            h.vy = 0;
+            h.enSuelo = true;
+            h.saltos = 0;
+        }
+    }
+    
+    if (nivel === 4) camX = Math.max(0, h.x - 150);
+}
+
+function update() {
+    ctx.clearRect(0,0, canvas.width, canvas.height);
+    frame++;
+    motorFisicas();
+
+    if (nivel === 4) {
+        ctx.fillStyle = "#5c94fc"; ctx.fillRect(0,0,canvas.width, canvas.height);
+        // Dibujar Fondo decorativo
+        ctx.fillStyle = "#92d050"; 
+        ctx.beginPath(); ctx.arc(300-camX*0.2, canvas.height-40, 100, 0, Math.PI*2); ctx.fill(); // Colinas
+        
+        bloques.forEach(dibujarBloque);
+        
+        enemigos.forEach((en, i) => {
+            en.x -= 2;
+            ctx.font = "40px Arial";
+            ctx.fillText("👨‍🏫", en.x - camX, en.y); // Flanders
+            if (Math.hypot(h.x - en.x, h.y - en.y) < 40) {
+                if (h.vy > 0) { enemigos.splice(i,1); h.vy = -10; } // Pisar enemigo
+                else { vidas--; iniciarNivel(); }
+            }
+        });
+
+        // Homero
+        ctx.font = "50px Arial";
+        ctx.fillText("👨‍🦲", h.x - camX, h.y + 40);
+        
+        if (h.x > 4000) { alert("¡GANASTE!"); nivel = 1; iniciarNivel(); }
+    } else {
+        // Motores simplificados niveles 1-3
+        ctx.fillStyle = nivel === 1 ? "#f1c40f" : (nivel === 2 ? "#2c3e50" : "#000");
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+        
+        if(frame % 100 === 0) items.push({x: canvas.width, y: canvas.height-120});
+        items.forEach((it, i) => {
+            it.x -= 7;
+            ctx.font = "40px Arial"; ctx.fillText("🍩", it.x, it.y);
+            if (Math.hypot(h.x - it.x, h.y - it.y) < 40) { items.splice(i,1); puntos++; document.getElementById('puntos').innerText = puntos.toString().padStart(6,'0'); }
+        });
+        
+        ctx.font = "50px Arial"; ctx.fillText("👨‍🦲", h.x, h.y + 40);
+        if (puntos >= (nivel * 10)) { nivel++; puntos = 0; iniciarNivel(); }
+    }
+    
+    document.getElementById('vidas').innerText = vidas;
+    requestAnimationFrame(update);
+}
+
+window.onload = () => { resize(); update(); };
 </script>
 </body>
 </html>
