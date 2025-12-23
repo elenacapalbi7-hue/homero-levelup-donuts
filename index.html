@@ -3,30 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Odyssey GitHub Edition</title>
+    <title>Homer Odyssey GitHub v3</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #000; }
         canvas { display: block; width: 100%; height: 100%; }
 
         /* UI Superior */
-        #ui { position: absolute; top: 40px; width: 100%; display: flex; justify-content: space-around; 
+        #ui { position: absolute; top: 45px; width: 100%; display: flex; justify-content: space-around; 
               color: #00FF00; font-size: 18px; z-index: 50; text-shadow: 2px 2px #000; pointer-events: none; }
 
-        /* Controles Elevados y Cómodos */
-        .ctrl-panel { position: absolute; bottom: 120px; width: 100%; pointer-events: none; z-index: 100; }
+        /* CONTROLES SUPER ELEVADOS */
+        .ctrl-panel { position: absolute; bottom: 200px; width: 100%; pointer-events: none; z-index: 100; }
         .btn { 
-            position: absolute; width: 80px; height: 80px; 
-            background: rgba(255, 255, 255, 0.1); border: 3px solid #FFD700; 
+            position: absolute; width: 75px; height: 75px; 
+            background: rgba(255, 255, 255, 0.15); border: 3px solid #FFD700; 
             border-radius: 50%; display: flex; justify-content: center; 
-            align-items: center; font-size: 30px; color: white; 
+            align-items: center; font-size: 28px; color: white; 
             pointer-events: auto; -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
-        #bL { left: 30px; }
-        #bR { left: 120px; }
-        #bA { right: 30px; width: 90px; height: 90px; background: rgba(255, 215, 0, 0.2); }
+        #bL { left: 25px; }
+        #bR { left: 115px; }
+        #bA { right: 25px; width: 90px; height: 90px; border-width: 4px; }
 
-        /* Pantallas */
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
                    background: rgba(0,0,0,0.9); display: flex; flex-direction: column; 
                    justify-content: center; align-items: center; color: white; z-index: 200; text-align: center; }
@@ -52,7 +52,7 @@
 
     <div id="overlay">
         <h1 id="title">HOMER 25</h1>
-        <p id="msg">Escala o muere en el Nivel 2</p>
+        <p id="msg">¡Controles elevados y nuevos retos!</p>
         <button class="btn-go" onclick="startGame()">¡EMPEZAR!</button>
     </div>
 </div>
@@ -64,9 +64,9 @@
           clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay');
 
     let level = 1, score = 0, lives = 3, isPlaying = false, frame = 0;
-    let player = { x: 0, y: 0, w: 50, h: 60, vx: 0, vy: 0, grav: 0.7, jumps: 0 };
+    let player = { x: 0, y: 0, w: 50, h: 60, vx: 0, vy: 0, grav: 0.7, jumps: 0, friction: 0.98 };
     let items = [], obstacles = [], platforms = [];
-    let camY = 0;
+    let camY = 0, bgColor = "#000";
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
@@ -78,11 +78,13 @@
         player.x = canvas.width / 2;
         player.y = canvas.height - 150;
         player.vx = 0; player.vy = 0;
+        
+        // Cambiar color de fondo según nivel
+        bgColor = `hsl(${(level * 40) % 360}, 30%, 5%)`;
 
-        if(level === 2) {
-            // Generar escaleras iniciales
-            for(let i=0; i<10; i++) {
-                platforms.push({x: Math.random()*(canvas.width-150), y: canvas.height - (i*150), w: 150, h: 20});
+        if(level === 2) { // Generar plataformas únicas para escalada
+            for(let i=0; i<15; i++) {
+                platforms.push({x: Math.random()*(canvas.width-120), y: canvas.height - (i*160), w: 120, h: 20, trap: i > 2 && Math.random() > 0.6});
             }
         }
     }
@@ -91,59 +93,54 @@
         if(!isPlaying) return;
         frame++;
 
-        // Físicas según nivel
-        let curGrav = (level === 3) ? -0.7 : 0.7; // Gravedad invertida nivel 3
-        player.vy += curGrav;
+        // Físicas
+        player.vy += player.grav;
         player.y += player.vy;
+        
+        if(level === 3) player.vx *= 0.99; // Hielo/Resbaladizo
+        else player.vx *= 0.85; // Frenado normal
+        
         player.x += player.vx;
 
-        // --- LÓGICA NIVEL 2 (ESCALADA) ---
+        // --- LÓGICA NIVEL 2 (ESCALADA VERTICAL) ---
         if(level === 2) {
-            if(player.y < canvas.height / 2) {
-                let diff = (canvas.height / 2) - player.y;
-                player.y = canvas.height / 2;
-                camY += diff;
+            if(player.y < canvas.height / 2.5) {
+                let scroll = (canvas.height / 2.5) - player.y;
+                player.y = canvas.height / 2.5;
                 platforms.forEach(p => {
-                    p.y += diff;
+                    p.y += scroll;
                     if(p.y > canvas.height) {
-                        p.y = -20;
-                        p.x = Math.random()*(canvas.width-150);
+                        p.y = -20; p.x = Math.random()*(canvas.width-120);
+                        p.trap = Math.random() > 0.5;
                     }
                 });
-                items.forEach(it => it.y += diff);
+                items.forEach(it => it.y += scroll);
+                obstacles.forEach(o => o.y += scroll);
             }
-            if(player.y > canvas.height) { gameOver(); } // Caerse es morir
+            if(player.y > canvas.height) { die(); }
         }
 
-        // Colisión Plataformas
+        // Colisiones con plataformas y trampas
         platforms.forEach(p => {
             if(player.x + player.w > p.x && player.x < p.x + p.w &&
-               player.y + player.h > p.y && player.y + player.h < p.y + p.h + 15 &&
-               player.vy > 0) {
-                player.y = p.y - player.h;
-                player.vy = 0;
-                player.jumps = 0;
+               player.y + player.h > p.y && player.y + player.h < p.y + p.h + 15 && player.vy > 0) {
+                if(p.trap) { die(); } // Las plataformas rojas matan
+                player.y = p.y - player.h; player.vy = 0; player.jumps = 0;
             }
         });
 
-        // Suelo (Solo Nivel 1 y 3)
+        // Suelo solo nivel 1, 3 y superiores
         if(level !== 2) {
-            let floor = (level === 3) ? 80 : canvas.height - 100;
-            if(level === 3 && player.y < floor) { player.y = floor; player.vy = 0; player.jumps = 0; }
-            if(level !== 3 && player.y > floor) { player.y = floor; player.vy = 0; player.jumps = 0; }
+            if(player.y > canvas.height - 100) { player.y = canvas.height - 100; player.vy = 0; player.jumps = 0; }
         }
 
         // Límites
         if(player.x < 0) player.x = 0;
         if(player.x > canvas.width - player.w) player.x = canvas.width - player.w;
 
-        // Spawn de Relojes
+        // Generación Infinita de Relojes
         if(items.length < 1) {
-            items.push({ 
-                x: Math.random()*(canvas.width-50), 
-                y: (level===2) ? -50 : (level===3) ? canvas.height : -50,
-                vy: (level===2) ? 0 : (level===3) ? -3 : 3 
-            });
+            items.push({ x: 30 + Math.random()*(canvas.width-60), y: -50, vy: 2 + (level * 0.3) });
         }
 
         items.forEach((it, i) => {
@@ -153,32 +150,41 @@
                 items.splice(i, 1);
                 if(score >= 10) nextLevel();
             }
+            if(it.y > canvas.height) items.splice(i,1); // Si cae, se borra y el spawn crea otro
+        });
+
+        // Obstáculos laterales (Esquivar)
+        if(frame % (Math.max(40, 150 - level*5)) === 0 && level !== 2) {
+            obstacles.push({ x: canvas.width, y: canvas.height - 110, vx: -4 - (level*0.4) });
+        }
+        obstacles.forEach((o, i) => {
+            o.x += o.vx;
+            if(Math.hypot(player.x - o.x, player.y - o.y) < 45) { die(); obstacles.splice(i, 1); }
+            if(o.x < -50) obstacles.splice(i,1);
         });
     }
 
     function draw() {
-        ctx.fillStyle = "#000"; ctx.fillRect(0,0,canvas.width, canvas.height);
+        ctx.fillStyle = bgColor; ctx.fillRect(0,0,canvas.width, canvas.height);
         
-        // Suelo Neón
-        ctx.fillStyle = "#00FF00";
-        if(level !== 2) ctx.fillRect(0, (level===3)?0:canvas.height-45, canvas.width, 45);
+        // Suelo
+        if(level !== 2) { ctx.fillStyle = "#00FF00"; ctx.fillRect(0, canvas.height-45, canvas.width, 45); }
 
-        // Plataformas
-        ctx.fillStyle = "#00BFFF";
-        platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+        // Plataformas (Azul = Normal, Rojo = Trampa)
+        platforms.forEach(p => {
+            ctx.fillStyle = p.trap ? "#FF0000" : "#00BFFF";
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            if(p.trap) { ctx.font = "15px Arial"; ctx.fillText("🔥", p.x + p.w/2 - 7, p.y + 15); }
+        });
 
-        // Relojes con brillo
-        ctx.shadowBlur = 15; ctx.shadowColor = "#00FF00";
+        // Relojes
         ctx.font = "45px Arial";
         items.forEach(it => ctx.fillText("⏰", it.x, it.y));
-        ctx.shadowBlur = 0;
+        obstacles.forEach(o => ctx.fillText("💣", o.x, o.y + 40));
 
         // Homero
         ctx.font = "60px Arial";
-        ctx.save();
-        if(level === 3) { ctx.scale(1, -1); ctx.fillText("🏃‍♂️", player.x, -player.y); }
-        else { ctx.fillText("🏃‍♂️", player.x, player.y + 55); }
-        ctx.restore();
+        ctx.fillText("🏃‍♂️", player.x, player.y + 55);
 
         if(isPlaying) requestAnimationFrame(draw);
         update();
@@ -186,20 +192,31 @@
 
     // CONTROLES
     const bl = document.getElementById('bL'), br = document.getElementById('bR'), ba = document.getElementById('bA');
-    bl.ontouchstart = (e) => { e.preventDefault(); player.vx = -7; };
-    br.ontouchstart = (e) => { e.preventDefault(); player.vx = 7; };
-    bl.ontouchend = br.ontouchend = () => { player.vx = 0; };
-    ba.ontouchstart = (e) => {
-        e.preventDefault();
-        if(player.jumps < 2) {
-            player.vy = (level === 3) ? 16 : -16;
-            player.jumps++;
-        }
-    };
+    bl.ontouchstart = (e) => { e.preventDefault(); player.vx = -8; };
+    br.ontouchstart = (e) => { e.preventDefault(); player.vx = 8; };
+    bl.ontouchend = br.ontouchend = () => { if(level !== 3) player.vx = 0; };
+    ba.ontouchstart = (e) => { e.preventDefault(); if(player.jumps < 2) { player.vy = -16; player.jumps++; } };
 
     function startGame() { overlay.style.display = "none"; initLevel(); isPlaying = true; draw(); }
-    function nextLevel() { isPlaying = false; level++; overlay.style.display = "flex"; }
-    function gameOver() { isPlaying = false; level = 1; lives = 3; overlay.style.display = "flex"; }
+    
+    function die() {
+        lives--; livesEl.innerText = lives;
+        if(lives <= 0) gameOver();
+        else { player.y = canvas.height - 200; player.vy = 0; }
+    }
+
+    function nextLevel() {
+        isPlaying = false; level++;
+        if(level > 25) { alert("¡ERES EL REY DE GITHUB!"); location.reload(); }
+        overlay.style.display = "flex";
+        document.getElementById('msg').innerText = "¡Nivel logrado! Prepárate para el siguiente...";
+    }
+
+    function gameOver() {
+        isPlaying = false; level = 1; lives = 3;
+        overlay.style.display = "flex";
+        document.getElementById('msg').innerText = "¡D'OH! Perdiste todas las vidas.";
+    }
 </script>
 </body>
 </html>
