@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer's Great Adventure</title>
+    <title>Homer Adventure FIX</title>
     <style>
-        body { margin: 0; background: #5c94fc; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
-        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; pointer-events: none; z-index: 10; font-size: 1.2rem; }
-        #controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; }
-        .btn { width: 70px; height: 70px; background: rgba(0, 0, 0, 0.4); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; pointer-events: auto; }
+        body { margin: 0; background: #5c94fc; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; pointer-events: none; z-index: 10; font-weight: bold; }
+        #controls { position: absolute; bottom: 50px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 20; }
+        .btn { width: 70px; height: 70px; background: rgba(0,0,0,0.5); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; pointer-events: auto; user-select: none; }
     </style>
 </head>
 <body>
@@ -16,7 +16,6 @@
 <div id="ui">
     <div>🍩 x <span id="donas">0</span></div>
     <div>❤️ x <span id="vidas">3</span></div>
-    <div id="msg" style="color: yellow;"></div>
 </div>
 
 <div id="controls">
@@ -38,55 +37,40 @@ let blocks = [], enemies = [], items = [], fx = [];
 let keys = { left: false, right: false };
 
 const player = {
-    x: 100, y: 0, w: 40, h: 60, vx: 0, vy: 0,
-    isSuper: false, timerSuper: 0, onGround: false
+    x: 100, y: 0, w: 40, h: 80, vx: 0, vy: 0,
+    isSuper: false, timerSuper: 0, onGround: false, saltos: 0
 };
 
-function init() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    player.y = canvas.height - 200;
-    buildLevel();
-    loop();
-}
-
 function buildLevel() {
-    blocks = []; enemies = []; items = [];
-    const floor = canvas.height - 80;
+    blocks = []; enemies = []; items = []; fx = [];
+    const floorY = canvas.height - 80;
 
-    // Generar Suelo y Obstáculos (Diseño manual para emoción)
-    for(let i=0; i<400; i++) {
-        // Suelo con huecos de peligro
-        if (!(i > 45 && i < 49) && !(i > 110 && i < 114)) {
-            blocks.push({x: i*40, y: floor, t:'S'});
-            blocks.push({x: i*40, y: floor + 40, t:'S'});
+    for(let i=0; i<500; i++) {
+        // Suelo con huecos
+        if (!(i > 40 && i < 44) && !(i > 100 && i < 105) && !(i > 180 && i < 186)) {
+            blocks.push({x: i*40, y: floorY, t:'S'});
+            blocks.push({x: i*40, y: floorY + 40, t:'S'});
         }
 
-        // Tuberías (Plantas nucleares)
-        if(i === 30 || i === 85 || i === 150) {
-            blocks.push({x: i*40, y: floor-40, t:'P'});
-            blocks.push({x: i*40, y: floor-80, t:'P'});
-            enemies.push({x: i*40, y: floor-40, vx: -2, type:'Flanders'});
+        // Tuberías / Plantas Nucleares
+        if(i === 25 || i === 70 || i === 130) {
+            blocks.push({x: i*40, y: floorY - 40, t:'P'});
+            blocks.push({x: i*40, y: floorY - 80, t:'P'});
+            enemies.push({x: i*40 + 5, y: floorY - 120, vx: -2});
         }
 
-        // Estructuras de bloques aéreos
-        if(i === 20) spawnBlockRow(i*40, floor-160, 5, 'B');
-        if(i === 22) blocks.find(b => b.x === i*40 && b.y === floor-160).t = '?';
-        
-        // El bloque de la Cerveza Duff
-        if(i === 60) blocks.push({x: i*40, y: floor-160, t:'?', item:'Duff'});
-
-        // Bloque de Donas Múltiples (Estrella)
-        if(i === 100) blocks.push({x: i*40, y: floor-200, t:'E', hits: 5});
+        // Bloques aéreos y Sorpresas
+        if(i % 30 === 0 && i > 10) {
+            for(let j=0; j<5; j++) {
+                let tipo = (j === 2) ? '?' : 'B';
+                let item = (i === 30 && j === 2) ? 'Duff' : (i === 90 && j === 2 ? 'Star' : 'Dona');
+                blocks.push({x: (i+j)*40, y: floorY - 160, t: tipo, item: item, hits: 5});
+            }
+        }
     }
 }
 
-function spawnBlockRow(x, y, count, type) {
-    for(let i=0; i<count; i++) blocks.push({x: x + i*40, y: y, t: type});
-}
-
 function update() {
-    // Movimiento y Gravedad
     if (keys.left) player.vx = -6;
     else if (keys.right) player.vx = 6;
     else player.vx *= 0.8;
@@ -95,76 +79,68 @@ function update() {
     player.x += player.vx;
     player.y += player.vy;
 
-    // Cámara sigue a Homero
-    camX = player.x - 150;
+    camX = player.x - 100;
 
-    // Super Poder
     if (player.timerSuper > 0) {
         player.timerSuper--;
-        player.isSuper = true;
-        player.h = 90;
-        document.getElementById('msg').innerText = "¡MODO BEER!";
-    } else {
-        player.isSuper = false;
-        player.h = 60;
-        document.getElementById('msg').innerText = "";
+        if (player.timerSuper === 0) player.isSuper = false;
     }
 
-    // Colisiones con Bloques
     player.onGround = false;
     blocks.forEach((b, idx) => {
         if (player.x + player.w > b.x && player.x < b.x + 40 && player.y + player.h > b.y && player.y < b.y + 40) {
-            // Piso: Ajuste exacto para no flotar
             if (player.vy > 0 && player.y + player.h - player.vy <= b.y) {
-                player.y = b.y - player.h; player.vy = 0; player.onGround = true;
-            }
-            // Techo: Activar bloques
-            else if (player.vy < 0 && player.y - player.vy >= b.y + 40) {
+                player.y = b.y - player.h; player.vy = 0; player.onGround = true; player.saltos = 0;
+            } else if (player.vy < 0 && player.y - player.vy >= b.y + 40) {
                 player.y = b.y + 40; player.vy = 2;
-                handleBlockHit(b, idx);
+                hitBlock(b, idx);
             }
         }
     });
 
-    // Enemigos Flanders
     enemies.forEach((en, idx) => {
         en.x += en.vx;
-        if (Math.abs(player.x - en.x) < 30 && Math.abs(player.y - en.y) < 40) {
-            if (player.vy > 0) { // Aplastar
-                enemies.splice(idx, 1); player.vy = -10;
-            } else if (!player.isSuper) { // Morir
-                die();
-            }
+        if (Math.abs(player.x - en.x) < 30 && Math.abs(player.y - en.y) < 50) {
+            if (player.vy > 0) { enemies.splice(idx, 1); player.vy = -10; }
+            else if (!player.isSuper) { die(); }
         }
     });
 
-    // Abismo
+    items.forEach((it, idx) => {
+        it.y += 3;
+        if (Math.abs(player.x - it.x) < 40 && Math.abs(player.y - it.y) < 80) {
+            if(it.t === '🍺') { player.isSuper = true; player.timerSuper = 600; }
+            items.splice(idx, 1);
+        }
+    });
+
     if (player.y > canvas.height) die();
 }
 
-function handleBlockHit(b, idx) {
-    if (b.t === '?' || b.t === 'E') {
+function hitBlock(b, idx) {
+    if (b.t === '?' || b.t === 'B') {
         if (b.item === 'Duff') {
-            items.push({x: b.x, y: b.y-40, t:'🍺', vx: 2, vy: -5});
-        } else {
-            spawnFX(b.x, b.y-40, '🍩');
-            countDonas++;
+            items.push({x: b.x, y: b.y - 40, t: '🍺'});
+            b.item = null; b.t = 'U';
+        } else if (b.item === 'Star') {
+            spawnFX(b.x, b.y - 40, '🍩');
+            countDonas++; b.hits--;
+            if(b.hits <= 0) { b.t = 'U'; b.item = null; }
+        } else if (b.item === 'Dona') {
+            spawnFX(b.x, b.y - 40, '🍩');
+            countDonas++; b.t = 'U'; b.item = null;
+        } else if (b.t === 'B' && player.isSuper) {
+            blocks.splice(idx, 1);
         }
-        if (b.t === 'E' && b.hits > 1) b.hits--;
-        else b.t = 'U'; // Bloque usado
-    } else if (b.t === 'B' && player.isSuper) {
-        blocks.splice(idx, 1); // Romper ladrillo
     }
 }
 
-function spawnFX(x, y, char) {
-    fx.push({x, y, char, vy: -5, life: 30});
-}
+function spawnFX(x, y, char) { fx.push({x, y, char, vy: -5, life: 20}); }
 
 function die() {
     countVidas--;
     player.x = 100; player.y = 0;
-    if(countVidas <= 0) { alert("GAME OVER"); countVidas = 3; countDonas = 0; buildLevel(); }
+    if(countVidas <= 0) { countVidas = 3; countDonas = 0; buildLevel(); }
 }
 
 function draw() {
@@ -172,45 +148,42 @@ function draw() {
     ctx.save();
     ctx.translate(-camX, 0);
 
-    // Dibujar Bloques con colores de Mario
     blocks.forEach(b => {
-        ctx.fillStyle = b.t === 'S' ? '#944828' : b.t === 'B' ? '#e76e33' : b.t === '?' || b.t === 'E' ? '#f1c40f' : b.t === 'P' ? '#27ae60' : '#7f8c8d';
+        ctx.fillStyle = b.t === 'S' ? '#944828' : b.t === 'B' ? '#e76e33' : b.t === '?' ? '#f1c40f' : b.t === 'P' ? '#27ae60' : '#7f8c8d';
         ctx.fillRect(b.x, b.y, 39, 39);
-        ctx.strokeStyle = 'black'; ctx.strokeRect(b.x, b.y, 40, 40);
-        if(b.t === '?' || b.t === 'E') { ctx.fillStyle='white'; ctx.fillText(b.t==='E'?'⭐':'?', b.x+12, b.y+25); }
+        if(b.t === '?') { ctx.fillStyle='white'; ctx.fillText("?", b.x+15, b.y+25); }
     });
 
-    // Flanders y FX
-    enemies.forEach(en => ctx.fillText("👨‍🏫", en.x, en.y+30));
-    fx.forEach((f, i) => { f.y += f.vy; f.life--; ctx.fillText(f.char, f.x+10, f.y); if(f.life<=0) fx.splice(i,1); });
-    items.forEach(it => { it.y += 2; ctx.fillText(it.t, it.x, it.y+25); if(Math.abs(player.x-it.x)<30) { player.timerSuper=600; items=[]; } });
+    enemies.forEach(en => ctx.fillText("👨‍🏫", en.x, en.y + 35));
+    fx.forEach((f, i) => { f.y += f.vy; f.life--; ctx.fillText(f.char, f.x+10, f.y); if(f.life<0) fx.splice(i,1); });
+    items.forEach(it => ctx.fillText(it.t, it.x, it.y+20));
 
-    // Homero - Cuerpo Completo y sólido
-    ctx.font = player.isSuper ? "70px Arial" : "50px Arial";
-    ctx.fillText("👨‍🦲", player.x, player.y + (player.isSuper ? 60 : 45));
-    ctx.font = player.isSuper ? "50px Arial" : "35px Arial";
-    ctx.fillText("👕", player.x + 5, player.y + (player.isSuper ? 95 : 70));
-    ctx.fillText("👖", player.x + 5, player.y + (player.isSuper ? 130 : 95));
+    // HOMERO CUERPO COMPLETO SIN FLOTAR
+    let size = player.isSuper ? 1.5 : 1;
+    ctx.font = (40 * size) + "px Arial";
+    ctx.fillText("👨‍🦲", player.x, player.y + (35 * size));
+    ctx.fillText("👕", player.x + (2 * size), player.y + (60 * size));
+    ctx.fillText("👖", player.x + (2 * size), player.y + (85 * size));
 
-    // Meta final: Casa Simpson
-    ctx.font = "120px Arial"; ctx.fillText("🏠", 15000, floor-160);
-    ctx.font = "40px Arial"; ctx.fillText("👩‍🦱👧👦👶", 15050, floor-80);
+    // FINAL
+    ctx.font = "100px Arial"; ctx.fillText("🏠", 18000, canvas.height-200);
+    ctx.font = "40px Arial"; ctx.fillText("👩‍🦱👧👦👶", 18050, canvas.height-120);
 
     ctx.restore();
     document.getElementById('donas').innerText = countDonas;
     document.getElementById('vidas').innerText = countVidas;
 }
 
-// Eventos de control
-const btns = { left: 'left', right: 'right', jump: 'jump' };
-Object.entries(btns).forEach(([id, k]) => {
-    const el = document.getElementById(id);
-    el.ontouchstart = (e) => { e.preventDefault(); if(k==='jump'){ if(player.onGround) player.vy = -16; } else keys[k]=true; };
-    el.ontouchend = () => { if(k!=='jump') keys[k]=false; };
-});
+// CONTROLES
+const l = document.getElementById('left'), r = document.getElementById('right'), j = document.getElementById('jump');
+l.ontouchstart = e => { e.preventDefault(); keys.left = true; };
+l.ontouchend = () => keys.left = false;
+r.ontouchstart = e => { e.preventDefault(); keys.right = true; };
+r.ontouchend = () => keys.right = false;
+j.ontouchstart = e => { e.preventDefault(); if(player.saltos < 2) { player.vy = -15; player.saltos++; } };
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
-init();
+window.onload = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; buildLevel(); loop(); };
 </script>
 </body>
 </html>
