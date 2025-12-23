@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Runner: Springfield Pro</title>
+    <title>Homer Runner: Variedad Total</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; overflow: hidden; }
         #ui { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 18px; pointer-events: none; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; }
-        .btn-action { padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .btn-action { padding: 18px 50px; font-size: 24px; background: #FFD700; color: #333; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #b8860b; }
         #controls { position: absolute; bottom: 120px; width: 100%; display: flex; justify-content: center; z-index: 20; }
-        .jump-btn { width: 100px; height: 100px; background: rgba(255, 255, 255, 0.3); border: 4px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 45px; color: white; }
+        .jump-btn { width: 110px; height: 110px; background: rgba(255, 255, 255, 0.3); border: 5px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 50px; color: white; }
     </style>
 </head>
 <body>
@@ -25,8 +25,8 @@
 
     <div id="overlay">
         <h1 id="title">NIVEL 2</h1>
-        <p id="msg">¡Usa las PLATAFORMAS!<br>Doble salto para llegar arriba.</p>
-        <button class="btn-action" onclick="startGame()">¡EMPEZAR!</button>
+        <p id="msg">¡Cada tramo es una aventura!<br>Atrapa 10 relojes para ganar.</p>
+        <button class="btn-action" onclick="startGame()">¡JUGAR!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -45,69 +45,74 @@
     let isPlaying = false, scoreClocks = 0, scoreDonuts = 0, lives = 3, frameCount = 0;
     let platforms = [], items = [], gameSpeed = 5;
 
-    const player = { x: 80, y: 0, w: 60, h: 80, vy: 0, gravity: 0.7, jumpPower: -14, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
+    const player = { x: 70, y: 0, w: 60, h: 80, vy: 0, gravity: 0.6, jumpPower: -13, jumps: 0, maxJumps: 2, emoji: "🏃‍♂️" };
 
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
     resize();
 
-    // Generador de obstáculos y plataformas
-    function spawnWorld() {
-        let xPos = canvas.width + 50;
+    // GENERADOR DE SECUENCIAS VARIADAS
+    function spawnSequence() {
+        let x = canvas.width + 100;
         let groundY = canvas.height - 60;
+        let type = Math.floor(Math.random() * 6);
 
-        // 1. Siempre hay suelo base (pero con pequeños huecos a veces)
-        if (Math.random() > 0.1) {
-            platforms.push({ x: xPos, y: groundY, w: 200, h: 60, t: 'ground' });
-        }
-
-        // 2. PLATAFORMAS FLOTANTES (Lo que pedías para variedad)
-        if (Math.random() < 0.4) {
-            let platY = groundY - 120 - Math.random() * 80;
-            platforms.push({ x: xPos + 100, y: platY, w: 120, h: 20, t: 'platform' });
-            // Poner premio arriba de la plataforma
-            items.push({ x: xPos + 140, y: platY - 50, size: 40, t: 'donut', e: '🍩' });
-        }
-
-        // 3. OBSTÁCULOS DE DIFERENTE TIPO
-        let obstacleRoll = Math.random();
-        if (obstacleRoll < 0.3) {
-            items.push({ x: xPos + 50, y: groundY - 50, size: 50, t: 'bad', e: '🚧' });
-        } else if (obstacleRoll < 0.5) {
-            items.push({ x: xPos + 20, y: groundY - 80, size: 60, t: 'bad', e: '🚗' });
-        } else if (obstacleRoll < 0.8) {
-            items.push({ x: xPos, y: groundY - 40, size: 40, t: 'clock', e: '⏰' });
+        switch(type) {
+            case 0: // El Estacionamiento
+                platforms.push({x, y: groundY, w: 300, h: 60});
+                items.push({x: x+50, y: groundY-60, size: 50, t: 'bad', e: '🚗'});
+                items.push({x: x+150, y: groundY-180, size: 45, t: 'clock', e: '⏰'});
+                break;
+            case 1: // La Obra (Salto sobre pozo)
+                platforms.push({x, y: groundY, w: 100, h: 60});
+                items.push({x: x+20, y: groundY-50, size: 45, t: 'bad', e: '🚧'});
+                platforms.push({x: x+220, y: groundY, w: 150, h: 60});
+                items.push({x: x+250, y: groundY-150, size: 40, t: 'donut', e: '🍩'});
+                break;
+            case 2: // El Castillo de Nubes
+                platforms.push({x, y: groundY, w: 100, h: 60});
+                platforms.push({x: x+120, y: groundY-120, w: 100, h: 20, e: '☁️'});
+                platforms.push({x: x+240, y: groundY-220, w: 100, h: 20, e: '☁️'});
+                items.push({x: x+270, y: groundY-270, size: 45, t: 'clock', e: '⏰'});
+                platforms.push({x: x+360, y: groundY, w: 150, h: 60});
+                break;
+            case 3: // El Callejón de las Donas
+                platforms.push({x, y: groundY, w: 400, h: 60});
+                for(let i=0; i<3; i++) items.push({x: x+100+(i*60), y: groundY-140, size: 35, t: 'donut', e: '🍩'});
+                items.push({x: x+180, y: groundY-50, size: 45, t: 'bad', e: '🗑️'});
+                break;
+            case 4: // La Entrega Apilada
+                platforms.push({x, y: groundY, w: 300, h: 60});
+                items.push({x: x+50, y: groundY-50, size: 45, t: 'bad', e: '📦'});
+                items.push({x: x+100, y: groundY-50, size: 45, t: 'bad', e: '📦'});
+                items.push({x: x+150, y: groundY-150, size: 45, t: 'clock', e: '⏰'});
+                break;
+            case 5: // El Hidrante y la Bici
+                platforms.push({x, y: groundY, w: 350, h: 60});
+                items.push({x: x+80, y: groundY-50, size: 40, t: 'bad', e: '💧'});
+                items.push({x: x+220, y: groundY-50, size: 50, t: 'bad', e: '🚲'});
+                items.push({x: x+150, y: groundY-180, size: 40, t: 'donut', e: '🍩'});
+                break;
         }
     }
 
     function update() {
         if (!isPlaying) return;
+        player.vy += player.gravity; player.y += player.vy;
+        let onGround = false;
 
-        player.vy += player.gravity;
-        player.y += player.vy;
-        let onAnyGround = false;
-
-        // Colisión con Plataformas y Suelo
         platforms.forEach(p => {
             p.x -= gameSpeed;
             if (player.x + player.w > p.x && player.x < p.x + p.w &&
-                player.y + player.h > p.y && player.y + player.h < p.y + player.vy + 10 && player.vy >= 0) {
-                player.y = p.y - player.h;
-                player.vy = 0;
-                player.jumps = 0;
-                onAnyGround = true;
+                player.y + player.h > p.y && player.y + player.h < p.y + p.vy + 12 && player.vy >= 0) {
+                player.y = p.y - player.h; player.vy = 0; player.jumps = 0; onGround = true;
             }
         });
 
-        // Items y Obstáculos
         for (let i = items.length - 1; i >= 0; i--) {
-            let it = items[i];
-            it.x -= gameSpeed;
-            if (player.x < it.x + it.size && player.x + player.w > it.x &&
-                player.y < it.y + it.size && player.y + player.h > it.y) {
+            let it = items[i]; it.x -= gameSpeed;
+            if (player.x < it.x + it.size - 10 && player.x + player.w > it.x + 10 &&
+                player.y < it.y + it.size - 10 && player.y + player.h > it.y + 10) {
                 if (it.t === 'clock') { scoreClocks++; clocksEl.innerText = scoreClocks; if(scoreClocks>=10) win(); }
                 else if (it.t === 'donut') { scoreDonuts++; donutsEl.innerText = scoreDonuts; }
                 else { lives--; livesEl.innerText = lives; if(lives<=0) die(); }
@@ -116,32 +121,25 @@
             if (it.x < -100) items.splice(i, 1);
         }
 
-        if (frameCount % 60 === 0) spawnWorld();
+        if (frameCount % 110 === 0) spawnSequence();
         platforms = platforms.filter(p => p.x > -p.w);
-        
-        if (player.y > canvas.height) { lives--; livesEl.innerText = lives; if(lives<=0) die(); else resetPosition(); }
+        if (player.y > canvas.height) { lives--; livesEl.innerText = lives; if(lives<=0) die(); else {player.y=0; player.vy=0;} }
         frameCount++;
     }
 
-    function resetPosition() { player.y = 0; player.vy = 0; player.x = 80; }
-
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Dibujar Plataformas
         platforms.forEach(p => {
-            ctx.fillStyle = p.t === 'ground' ? "#6d4c41" : "#ffd54f";
-            ctx.fillRect(p.x, p.y, p.w, p.h);
-            ctx.strokeStyle = "#000"; ctx.strokeRect(p.x, p.y, p.w, p.h);
+            ctx.fillStyle = p.e === '☁️' ? "white" : "#ffd54f";
+            if(p.e !== '☁️') {
+                ctx.fillRect(p.x, p.y, p.w, p.h);
+                ctx.strokeStyle = "#333"; ctx.lineWidth = 3; ctx.strokeRect(p.x, p.y, p.w, p.h);
+            } else {
+                ctx.font = "60px Arial"; ctx.fillText(p.e, p.x, p.y + 40);
+            }
         });
-
-        // Dibujar Items
         items.forEach(it => { ctx.font = it.size + "px Arial"; ctx.fillText(it.e, it.x, it.y + it.size); });
-
-        // Homero
-        ctx.font = player.h + "px Arial";
-        ctx.fillText(player.emoji, player.x, player.y + player.h);
-
+        ctx.font = player.h + "px Arial"; ctx.fillText(player.emoji, player.x, player.y + player.h);
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
@@ -149,15 +147,13 @@
         scoreClocks = 0; scoreDonuts = 0; lives = 3; platforms = []; items = []; frameCount = 0;
         clocksEl.innerText = "0"; donutsEl.innerText = "0"; livesEl.innerText = "3";
         overlay.style.display = "none";
-        // Suelo inicial
-        platforms.push({ x: 0, y: canvas.height-60, w: canvas.width, h: 60, t: 'ground' });
-        isPlaying = true;
-        draw();
+        platforms.push({ x: 0, y: canvas.height-60, w: canvas.width + 200, h: 60 });
+        isPlaying = true; draw();
     }
 
     function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
-    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡GANASTE!"; }
-
+    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡EXCELENTE!"; }
+    
     const jump = () => { if (isPlaying && player.jumps < player.maxJumps) { player.vy = player.jumpPower; player.jumps++; } };
     document.getElementById('btnJump').ontouchstart = (e) => { e.preventDefault(); jump(); };
     window.onkeydown = (e) => { if(e.key === ' ' || e.key === 'ArrowUp') jump(); };
