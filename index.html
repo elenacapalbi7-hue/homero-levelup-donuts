@@ -3,20 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Homer Odyssey: 25 Niveles - Contraste Total</title>
+    <title>Homer Odyssey: 25 Niveles Únicos</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        /* Fondo oscuro permanente para visibilidad máxima */
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #001f3f; overflow: hidden; }
-        
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #001529; overflow: hidden; }
         #ui { position: absolute; top: 40px; width: 100%; display: flex; justify-content: space-around; color: #FFD700; text-shadow: 2px 2px #000; z-index: 50; font-size: 18px; pointer-events: none; }
-        #mode-info { position: absolute; top: 75px; width: 100%; text-align: center; color: #ffffff; font-size: 16px; text-shadow: 1px 1px #000; z-index: 50; background: rgba(0,0,0,0.3); padding: 5px 0; }
-        
+        #mode-info { position: absolute; top: 75px; width: 100%; text-align: center; color: #fff; font-size: 14px; z-index: 50; background: rgba(0,0,0,0.5); padding: 5px 0; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; padding: 20px; }
-        .btn-action { padding: 20px 45px; font-size: 22px; background: #FFD700; color: #333; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; }
-
-        #controls { position: absolute; bottom: 140px; width: 100%; display: flex; justify-content: center; gap: 25px; z-index: 80; }
-        .btn { width: 85px; height: 85px; background: rgba(255,255,255,0.9); border: 4px solid #FFD700; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 35px; color: #000; user-select: none; }
+        .btn-action { padding: 18px 40px; font-size: 20px; background: #FFD700; color: #000; border: none; border-radius: 15px; font-weight: bold; }
+        #controls { position: absolute; bottom: 130px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 80; }
+        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.9); border: 4px solid #FFD700; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; user-select: none; }
     </style>
 </head>
 <body>
@@ -27,11 +23,11 @@
         <div>❤️ <span id="lives">3</span></div>
         <div>⏰ <span id="clocks">0</span>/10</div>
     </div>
-    <div id="mode-info">MODO: CARGANDO...</div>
+    <div id="mode-info">CARGANDO...</div>
 
     <div id="overlay">
         <h1 id="title">HOMER 25</h1>
-        <p id="msg">Preparando desafío...</p>
+        <p id="msg">¡Cada nivel es un mundo diferente!</p>
         <button class="btn-action" id="startBtn">¡EMPEZAR!</button>
     </div>
 
@@ -50,19 +46,20 @@
     const lvlEl = document.getElementById('lvl'), livesEl = document.getElementById('lives'), clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay'), modeTxt = document.getElementById('mode-info'), startBtn = document.getElementById('startBtn');
 
     let level = 1, score = 0, lives = 3, isPlaying = false, frame = 0;
-    let player = { x: 0, y: 0, w: 60, h: 80, vx: 0, vy: 0, grav: 0.7, jumps: 0, angle: 0, rot: 0 };
+    let player = { x: 0, y: 0, vx: 0, vy: 0, grav: 0.7, jumps: 0, angle: 0, size: 1 };
     let items = [], obstacles = [];
 
-    const levels = [
-        { n: "RECOLECTOR", h: "Atrapa 10 relojes que caen." },
-        { n: "EL SUELO ES LAVA", h: "¡No toques el piso! Salta en el aire con 🔘." },
-        { n: "TIRO AL BLANCO", h: "🔘 para lanzarte hacia el reloj." },
-        { n: "REDUCTOR", h: "⬅️ pequeño | ➡️ gigante." },
-        { n: "NADO", h: "Flechas para moverte en el agua." },
-        { n: "VIENTO", h: "¡Cuidado con las ráfagas!" },
-        { n: "HIELO", h: "Resbalas mucho, ten cuidado." },
-        { n: "NOCHE", h: "Solo ves lo que tienes cerca." },
-        // ... del 9 al 25 son variaciones extremas de estas lógicas
+    const levelData = [
+        { n: "RECOLECTOR", h: "Atrapa los relojes que caen." },
+        { n: "EL ESCALADOR", h: "¡No hay suelo! Salta entre paredes con ⬅️ y ➡️." },
+        { n: "PUNTERÍA FIJA", h: "🔘 para dispararte hacia la flecha." },
+        { n: "REDUCTOR", h: "⬅️ pequeño | ➡️ gigante. Salta con 🔘." },
+        { n: "NADO EXTREMO", h: "Flechas para moverte, 🔘 para subir." },
+        { n: "VIENTO NORTE", h: "El viento te empuja fuerte a la izquierda." },
+        { n: "HIELO RESBALOSO", h: "Frenar es casi imposible aquí." },
+        { n: "ZONA OSCURA", h: "Solo ves lo que tienes muy cerca." },
+        { n: "METEORITOS", h: "Esquiva las cajas que caen del cielo." }
+        // Los niveles 10-25 incrementan velocidad y mezclan estas físicas.
     ];
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -72,66 +69,75 @@
     function initLevel() {
         score = 0; clocksEl.innerText = "0/10"; lvlEl.innerText = level;
         items = []; obstacles = []; frame = 0;
-        player.vx = 0; player.vy = 0; player.angle = 0; player.rot = 0;
-        player.x = canvas.width/2 - 30; player.y = canvas.height - 200;
-        modeTxt.innerText = "MODO: " + levels[(level-1)%levels.length].n;
+        player.vx = 0; player.vy = 0; player.angle = 0;
+        player.x = canvas.width / 2 - 30;
+        player.y = (level === 2) ? canvas.height / 2 : canvas.height - 150;
+        modeTxt.innerText = "MODO: " + (levelData[level-1]?.n || "DESAFÍO PRO");
     }
 
-    function spawnItem() {
+    function spawn() {
         if(items.length < 1) {
             items.push({
                 x: 50 + Math.random()*(canvas.width-100),
-                y: (level === 2 || level === 3) ? 150 + Math.random()*200 : -50,
-                vy: 2 + (level * 0.1),
+                y: (level === 2 || level === 3) ? 100 + Math.random()*300 : -50,
+                vy: 2 + (level * 0.3),
                 timer: 0
             });
+        }
+        if(frame % (150 - level*2) === 0) {
+            obstacles.push({ x: canvas.width + 50, y: canvas.height - 130, vx: -3 - (level*0.5), e: '🚧' });
         }
     }
 
     function update() {
         if(!isPlaying) return;
         frame++;
-        spawnItem();
+        spawn();
 
-        let type = (level - 1) % levels.length;
-
-        // --- LÓGICAS DE NIVEL ---
-        if(type === 0 || type >= 3) { // Movimiento Normal
+        // --- LÓGICAS ÚNICAS ---
+        if(level === 1 || level >= 4) { // Lógica estándar mejorada
             player.vy += player.grav;
+            if(level === 6) player.vx -= 0.5; // Viento
+            if(level === 7) player.vx *= 0.99; // Hielo
             player.x += player.vx;
             player.y += player.vy;
             if(player.y > canvas.height - 140) { player.y = canvas.height - 140; player.vy = 0; player.jumps = 0; }
         }
-        else if(type === 1) { // EL SUELO ES LAVA
-            player.vy += 0.4;
+        else if(level === 2) { // EL ESCALADOR
+            player.vy += 0.5;
             player.x += player.vx;
             player.y += player.vy;
-            if(player.y > canvas.height - 100) { lives--; livesEl.innerText = lives; player.y = 100; if(lives<=0) gameOver(); }
+            if(player.y > canvas.height || player.y < 0) { resetPos(); }
         }
-        else if(type === 2) { // TIRO AL BLANCO
-            if(player.vx === 0 && player.vy === 0) { // En reposo, rotando
-                player.rot += 0.08;
-                player.x = canvas.width/2 - 30;
-                player.y = canvas.height/2;
-            } else { // En vuelo
+        else if(level === 3) { // PUNTERÍA
+            player.angle += 0.07;
+            if(player.vx !== 0 || player.vy !== 0) {
                 player.x += player.vx;
                 player.y += player.vy;
-                if(player.x < 0 || player.x > canvas.width || player.y < 0 || player.y > canvas.height) {
-                    player.vx = 0; player.vy = 0; // Regresa al centro si falla
+                if(player.x < -50 || player.x > canvas.width+50 || player.y < -50 || player.y > canvas.height+50) {
+                    player.vx = 0; player.vy = 0; player.x = canvas.width/2; player.y = canvas.height/2;
                 }
             }
         }
 
-        // --- GESTIÓN DE ITEMS ---
+        // Colisiones Items
         items.forEach((it, i) => {
-            if(type !== 2) it.y += it.vy; 
-            it.timer++;
+            if(level !== 2 && level !== 3) it.y += it.vy;
             if(Math.hypot(player.x - it.x, player.y - it.y) < 60) {
-                score++; clocksEl.innerText = score+"/10";
-                items.splice(i,1);
+                score++; clocksEl.innerText = score + "/10";
+                items.splice(i, 1);
                 if(score >= 10) nextLevel();
             }
-            if(it.y > canvas.height || it.timer > 300) items.splice(i,1); // Anti-bloqueo
+            if(it.y > canvas.height) items.splice(i, 1);
+        });
+
+        // Colisiones Obstáculos
+        obstacles.forEach((o, i) => {
+            o.x += o.vx;
+            if(Math.hypot(player.x - o.x, player.y - o.y) < 50) {
+                lives--; livesEl.innerText = lives; obstacles.splice(i,1);
+                if(lives <= 0) gameOver();
+            }
         });
 
         if(player.x < 0) player.x = 0; if(player.x > canvas.width-60) player.x = canvas.width-60;
@@ -140,62 +146,73 @@
     function draw() {
         ctx.clearRect(0,0,canvas.width, canvas.height);
         
-        // Suelo (Solo si no es lava)
-        if(((level-1)%levels.length) !== 1) {
-            ctx.fillStyle = "#333";
-            ctx.fillRect(0, canvas.height-80, canvas.width, 80);
-        } else {
-            ctx.fillStyle = "#FF4500"; // Lava visual
-            ctx.fillRect(0, canvas.height-40, canvas.width, 40);
+        // Guía visual para Nivel 3 (Flecha)
+        if(level === 3 && player.vx === 0) {
+            ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(player.x+30, player.y+40);
+            ctx.lineTo(player.x+30 + Math.cos(player.angle)*80, player.y+40 + Math.sin(player.angle)*80);
+            ctx.stroke();
         }
 
-        // Items con brillo
-        ctx.font = "50px Arial";
-        ctx.shadowColor = "white"; ctx.shadowBlur = 10;
-        items.forEach(it => ctx.fillText("⏰", it.x, it.y));
-        ctx.shadowBlur = 0;
+        // Suelo
+        if(level !== 2) {
+            ctx.fillStyle = "#1a1a1a";
+            ctx.fillRect(0, canvas.height-80, canvas.width, 80);
+        }
 
-        // Homero con rotación para el Nivel 3
-        ctx.save();
-        ctx.translate(player.x + 30, player.y + 40);
-        if(((level-1)%levels.length) === 2 && player.vx === 0) ctx.rotate(player.rot);
-        ctx.fillText("🏃‍♂️", -30, 30);
-        ctx.restore();
+        ctx.font = "50px Arial";
+        items.forEach(it => ctx.fillText("⏰", it.x, it.y));
+        obstacles.forEach(o => ctx.fillText(o.e, o.x, o.y + 40));
+        
+        ctx.font = (70 * player.size) + "px Arial";
+        ctx.fillText("🏃‍♂️", player.x, player.y + 60);
 
         if(isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
+    function resetPos() {
+        lives--; livesEl.innerText = lives;
+        player.x = canvas.width/2; player.y = canvas.height/2; player.vy = 0;
+        if(lives <= 0) gameOver();
+    }
+
     function nextLevel() {
         isPlaying = false; level++;
+        if(level > 25) { alert("¡MAESTRO DE HOMERO!"); location.reload(); return; }
         overlay.style.display = "flex";
-        document.getElementById('title').innerText = "¡NIVEL SUPERADO!";
-        document.getElementById('msg').innerText = levels[(level-1)%levels.length].h;
-        startBtn.innerText = "SIGUIENTE";
+        document.getElementById('title').innerText = "¡LOGRADO!";
+        document.getElementById('msg').innerText = levelData[level-1]?.h || "Prepárate...";
     }
 
     function gameOver() {
         isPlaying = false; lives = 3; level = 1;
         overlay.style.display = "flex";
         document.getElementById('title').innerText = "¡D'OH!";
-        startBtn.innerText = "REINTENTAR";
+        document.getElementById('msg').innerText = "Vuelve a empezar.";
     }
 
     function startGame() { overlay.style.display="none"; initLevel(); isPlaying=true; draw(); }
 
-    // --- CONTROLES ---
-    bL.ontouchstart = (e) => { e.preventDefault(); player.vx = -7; };
-    bR.ontouchstart = (e) => { e.preventDefault(); player.vx = 7; };
+    // CONTROLES
+    bL.ontouchstart = (e) => { 
+        e.preventDefault(); 
+        if(level === 4) player.size = 0.5;
+        else if(level === 2) { player.vx = -6; player.vy = -12; }
+        else player.vx = -7; 
+    };
+    bR.ontouchstart = (e) => { 
+        e.preventDefault(); 
+        if(level === 4) player.size = 2;
+        else if(level === 2) { player.vx = 6; player.vy = -12; }
+        else player.vx = 7; 
+    };
     bL.ontouchend = bR.ontouchend = () => { player.vx = 0; };
 
     bC.ontouchstart = (e) => {
         e.preventDefault();
-        let type = (level-1) % levels.length;
-        if(type === 1) { player.vy = -12; } // Salto infinito en lava
-        else if(type === 2) { // Lanzamiento en Tiro al Blanco
-            player.vx = Math.cos(player.rot) * 12;
-            player.vy = Math.sin(player.rot) * 12;
-        }
-        else if(player.jumps < 2) { player.vy = -16; player.jumps++; } // Salto doble normal
+        if(level === 3) { player.vx = Math.cos(player.angle)*15; player.vy = Math.sin(player.angle)*15; }
+        else if(player.jumps < 2) { player.vy = -16; player.jumps++; }
     };
 
     startBtn.onclick = startGame;
