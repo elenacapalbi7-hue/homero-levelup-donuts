@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Adventure FIXED</title>
+    <title>Homer's Real Adventure</title>
     <style>
         body { margin: 0; background: #5c94fc; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
         #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; pointer-events: none; }
         #controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; }
         .btn { width: 70px; height: 70px; background: rgba(0,0,0,0.6); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; user-select: none; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: yellow; font-size: 2rem; text-shadow: 3px 3px #000; display: none; text-align: center; z-index: 100; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 15px; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: yellow; font-size: 2rem; text-shadow: 3px 3px #000; display: none; text-align: center; z-index: 100; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 80%; }
     </style>
 </head>
 <body>
@@ -21,7 +21,7 @@
 <div id="msg"></div>
 
 <div id="controls">
-    <div style="display:flex; gap:10px;">
+    <div style="display:flex; gap:15px;">
         <div class="btn" id="left">⬅️</div>
         <div class="btn" id="right">➡️</div>
     </div>
@@ -35,9 +35,8 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
 let score = 0, lives = 3, camX = 0, active = true;
-let blocks = [], enemies = [], items = [], coins = [], fx = [];
+let blocks = [], enemies = [], items = [], coins = [], particles = [];
 let keys = { left: false, right: false };
-const floorPos = () => canvas.height - 80;
 
 const p = { 
     x: 100, y: 0, w: 40, h: 70, vx: 0, vy: 0, 
@@ -47,49 +46,69 @@ const p = {
 function init() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    p.y = floorPos() - 100;
-    createMap();
+    p.y = canvas.height - 200;
+    buildLevel();
     loop();
 }
 
-function createMap() {
+// DISEÑO DE NIVEL MANUAL (Cambiante, no repetitivo)
+function buildLevel() {
     blocks = []; enemies = []; items = []; coins = [];
-    const gY = floorPos();
+    const gY = canvas.height - 80;
 
-    for(let i=0; i<250; i++) {
-        let bx = i * 40;
-        
-        // Suelo con huecos justos
-        if (!(i > 40 && i < 44) && !(i > 100 && i < 104) && !(i > 180 && i < 184)) {
-            blocks.push({x: bx, y: gY, t: 'G'});
-        } else {
-            // Plataforma de rescate
-            if(i === 42 || i === 102 || i === 182) blocks.push({x: bx, y: gY - 120, t: 'B'});
-        }
+    // 1. ZONA INICIAL (Piso estable)
+    for(let i=0; i<30; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+    
+    // Bloques de tutorial
+    addBlock(15*40, gY-160, '?', 'beer'); 
+    addBlock(16*40, gY-160, 'B');
+    addBlock(17*40, gY-160, '?', 'dona');
 
-        // Tuberías Sólidas
-        if([20, 70, 130, 200].includes(i)) {
-            blocks.push({x: bx, y: gY-40, t: 'P'});
-            blocks.push({x: bx, y: gY-80, t: 'P'});
-            enemies.push({x: bx, y: gY-125, vx: -2.5, w: 40, h: 45});
-        }
+    // 2. PRIMERA TUBERÍA Y FLANDERS
+    addPipe(35*40, gY);
+    addEnemy(38*40, gY-40);
 
-        // Estructuras de bloques
-        if(i % 20 === 0 && i > 5) {
-            let isBeer = (i % 40 === 0);
-            blocks.push({x: bx, y: gY-160, t: 'B'});
-            blocks.push({x: bx+40, y: gY-160, t: '?', item: isBeer ? 'beer' : 'dona', hits: isBeer ? 1 : 5});
-            blocks.push({x: bx+80, y: gY-160, t: 'B'});
-        }
-        
-        // Donas en el camino
-        if(i % 5 === 0) coins.push({x: bx + 10, y: gY - 110});
+    // 3. ZONA DE SALTOS (Abismo con plataformas)
+    for(let i=45; i<55; i++) {
+        if(i % 3 === 0) blocks.push({x: i*40, y: gY-120, t: 'B'});
+        coins.push({x: i*40 + 10, y: gY-180});
     }
+
+    // 4. ZONA MEDIA (Estructura de ladrillos)
+    for(let i=60; i<100; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+    for(let i=0; i<5; i++) addBlock((70+i)*40, gY-160, i === 2 ? '?' : 'B', i === 2 ? 'beer' : null);
+    addEnemy(75*40, gY-40);
+    addEnemy(85*40, gY-40);
+
+    // 5. SEGUNDA TUBERÍA Y SUBIDA
+    addPipe(105*40, gY);
+    addBlock(105*40, gY-180, '?', 'star', 5); // Bloque de 5 donas
+
+    // 6. RECTA FINAL
+    for(let i=115; i<160; i++) blocks.push({x: i*40, y: gY, t: 'G'});
+    addPipe(130*40, gY);
+    addEnemy(135*40, gY-40);
+    
+    // Casa al final (en x = 155 * 40 = 6200)
+}
+
+function addBlock(x, y, t, content = null, hits = 1) {
+    blocks.push({x, y, t, content, hits});
+}
+
+function addPipe(x, y) {
+    blocks.push({x, y: y-40, t: 'P'});
+    blocks.push({x, y: y-80, t: 'P'});
+}
+
+function addEnemy(x, y) {
+    enemies.push({x, y, vx: -2, vy: 0, w: 40, h: 45, ground: false});
 }
 
 function update() {
     if(!active) return;
 
+    // Movimiento Homero
     if (keys.left) p.vx = -6;
     else if (keys.right) p.vx = 6;
     else p.vx *= 0.85;
@@ -116,6 +135,28 @@ function update() {
         }
     });
 
+    // Enemigos con Gravedad (Ya no flotan)
+    enemies.forEach((en, idx) => {
+        en.vy += 0.8;
+        en.x += en.vx;
+        en.y += en.vy;
+        
+        let onAnyGround = false;
+        blocks.forEach(b => {
+            if (en.x + en.w > b.x && en.x < b.x + 40 && en.y + en.h > b.y && en.y < b.y + 40) {
+                if (en.vy > 0) { en.y = b.y - en.h; en.vy = 0; onAnyGround = true; }
+                else en.vx *= -1;
+            }
+        });
+        if(!onAnyGround && en.y > canvas.height) enemies.splice(idx, 1);
+
+        if(Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 50) {
+            if(p.vy > 0) { enemies.splice(idx, 1); p.vy = -12; }
+            else if(!p.isSuper) reset();
+        }
+    });
+
+    // Items (Cerveza)
     items.forEach((it, idx) => {
         it.x += it.vx; it.vy += 0.8; it.y += it.vy;
         blocks.forEach(b => {
@@ -123,39 +164,32 @@ function update() {
                 if(it.vy > 0) { it.y = b.y-30; it.vy = 0; } else it.vx *= -1;
             }
         });
-        if(Math.hypot(p.x - it.x, p.y - it.y) < 50) { p.timer = 600; items.splice(idx, 1); }
-    });
-
-    enemies.forEach((en, idx) => {
-        en.x += en.vx;
-        if(Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 50) {
-            if(p.vy > 0) { enemies.splice(idx, 1); p.vy = -12; }
-            else if(!p.isSuper) reset();
-        }
+        if(Math.hypot(p.x - it.x, p.y - it.y) < 45) { p.timer = 600; items.splice(idx, 1); }
     });
 
     coins.forEach((c, i) => { if(Math.hypot(p.x-c.x, p.y-c.y) < 40) { coins.splice(i,1); score++; }});
-
     if(p.y > canvas.height) reset();
-    if(p.x > 9500) win();
+    if(p.x > 6100) win();
 }
 
 function handleHit(b, idx) {
     if(b.t === '?') {
-        if(b.item === 'beer') {
-            items.push({x: b.x, y: b.y-40, vx: 2.5, vy: -5, t:'🍺'});
+        if(b.content === 'beer') {
+            items.push({x: b.x, y: b.y-40, vx: 2, vy: -5, t:'🍺'});
             b.t = 'U';
         } else {
-            fx.push({x: b.x, y: b.y-40, vy: -6, l: 20}); score++;
-            b.hits--; if(b.hits <= 0) b.t = 'U';
+            particles.push({x: b.x, y: b.y-40, vy: -6, l: 20}); score++;
+            if(b.content === 'star') {
+                b.hits--; if(b.hits <= 0) b.t = 'U';
+            } else b.t = 'U';
         }
     } else if(p.isSuper && b.t === 'B') {
         blocks.splice(idx, 1);
     }
 }
 
-function reset() { lives--; p.x = 100; p.y = floorPos()-100; if(lives <= 0) location.reload(); }
-function win() { active = false; document.getElementById('msg').innerHTML = "¡GANASTE! 🏠<br>Familia reunida"; document.getElementById('msg').style.display = 'block'; }
+function reset() { lives--; p.x = 100; p.y = 0; if(lives <= 0) location.reload(); }
+function win() { active = false; document.getElementById('msg').innerHTML = "¡LO LOGRASTE! 🏠<br>Llegaste a casa"; document.getElementById('msg').style.display = 'block'; }
 
 function draw() {
     ctx.clearRect(0,0, canvas.width, canvas.height);
@@ -165,14 +199,14 @@ function draw() {
     blocks.forEach(b => {
         ctx.fillStyle = b.t==='G'?'#944828': b.t==='P'?'#27ae60': b.t==='B'?'#e76e33': b.t==='U'?'#7f8c8d':'#f1c40f';
         ctx.fillRect(b.x, b.y, 40, 40);
-        ctx.strokeStyle = "black"; ctx.strokeRect(b.x, b.y, 40, 40);
+        ctx.strokeRect(b.x, b.y, 40, 40);
         if(b.t === '?') { ctx.fillStyle='#fff'; ctx.font="20px Arial"; ctx.fillText("?", b.x+15, b.y+28); }
     });
 
-    enemies.forEach(en => { ctx.font="45px Arial"; ctx.fillText("👨‍🏫", en.x, en.y+40); });
+    enemies.forEach(en => { ctx.font="45px Arial"; ctx.fillText("👨‍🏫", en.x, en.y+42); });
     items.forEach(it => { ctx.font="35px Arial"; ctx.fillText(it.t, it.x, it.y+30); });
     coins.forEach(c => { ctx.font="25px Arial"; ctx.fillText("🍩", c.x, c.y+25); });
-    fx.forEach((f, i) => { f.y += f.vy; f.l--; ctx.fillText("🍩", f.x+10, f.y); if(f.l<0) fx.splice(i,1); });
+    particles.forEach((f, i) => { f.y += f.vy; f.l--; ctx.fillText("🍩", f.x+10, f.y); if(f.l<0) particles.splice(i,1); });
 
     let s = p.isSuper ? 1.3 : 1;
     ctx.font = (40*s)+"px Arial";
@@ -181,9 +215,7 @@ function draw() {
     ctx.fillText("👕", p.x, p.y + (60*s));
     ctx.fillText("👖", p.x, p.y + (85*s));
 
-    ctx.font="100px Arial"; ctx.fillText("🏠", 9600, floorPos()-100);
-    ctx.font="40px Arial"; ctx.fillText("👩‍🦱👧👦👶", 9650, floorPos()-20);
-
+    ctx.font="120px Arial"; ctx.fillText("🏠", 6200, canvas.height-200);
     ctx.restore();
     document.getElementById('donas').innerText = score;
     document.getElementById('vidas').innerText = lives;
@@ -202,7 +234,7 @@ const ctrl = (id, k) => {
 ctrl('left', 'left'); ctrl('right', 'right'); ctrl('jump', 'j');
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
-window.onload = init;
+init();
 </script>
 </body>
 </html>
