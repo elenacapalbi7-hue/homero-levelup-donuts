@@ -3,18 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer Adventure 1-1 Fixed</title>
+    <title>Homer Bros 1-1 Final</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Arial', sans-serif; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #5c94fc; overflow: hidden; }
         canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-        
-        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; font-size: 14px; z-index: 10; pointer-events: none; }
-        
-        /* Controles elevados para evitar gestos de Android/iOS */
-        #controls { position: absolute; bottom: 85px; width: 100%; display: flex; justify-content: space-between; padding: 0 25px; box-sizing: border-box; z-index: 20; }
-        .btn { width: 65px; height: 65px; background: rgba(255, 255, 255, 0.25); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; user-select: none; }
-        
+        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 14px; }
+        #controls { position: absolute; bottom: 85px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; z-index: 20; }
+        .btn { width: 65px; height: 65px; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 25px; color: white; user-select: none; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; flex-direction: column; justify-content: center; align-items: center; color: yellow; z-index: 100; text-align: center; }
     </style>
 </head>
@@ -23,22 +19,22 @@
 <div id="game-container">
     <div id="ui">
         <div>HOMERO<br>000000</div>
-        <div>🍩<br>x <span id="donas">00</span></div>
+        <div>🍩 x <span id="donas">0</span></div>
         <div>WORLD<br>1-1</div>
         <div>TIME<br><span id="timer">400</span></div>
     </div>
     
-    <div id="overlay">
+    <div id="overlay" onclick="location.reload()">
         <h1 id="msg-title">D'OH!</h1>
-        <p>TOCA AQUÍ PARA REINTENTAR</p>
+        <p>TOCA PARA REINTENTAR</p>
     </div>
 
     <div id="controls">
-        <div style="display:flex; gap:20px;">
+        <div style="display:flex; gap:15px;">
             <div class="btn" id="left">⬅️</div>
             <div class="btn" id="right">➡️</div>
         </div>
-        <div class="btn" id="jump">JUMP</div>
+        <div class="btn" id="jump">⬆️</div>
     </div>
     <canvas id="canvas"></canvas>
 </div>
@@ -48,164 +44,123 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const GRID = 40;
 
-let camX = 0, coins = 0, timeLeft = 400, active = true, frameCount = 0;
+let camX = 0, score = 0, coins = 0, timeLeft = 400, active = true;
 let blocks = [], enemies = [], items = [];
 let keys = { left: false, right: false };
 
-const p = { x: 100, y: 0, w: 32, h: 45, vx: 0, vy: 0, ground: false };
+const p = { x: 100, y: 0, w: 32, h: 42, vx: 0, vy: 0, ground: false, isSuper: false, star: 0 };
 
-function buildMap() {
-    blocks = []; enemies = []; items = [];
+function init() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
     const gY = canvas.height - 80;
-    p.y = gY - 100;
-
-    // 1. Suelo original con sus 3 huecos exactos
-    for(let i=0; i<220; i++) {
+    
+    // GENERAR MAPA 1-1 EXACTO
+    for(let i=0; i<250; i++) {
         if(!([69, 70, 86, 87, 88, 153, 154].includes(i))) {
             blocks.push({x: i*GRID, y: gY, w: GRID, h: GRID, t: 'G'});
         }
     }
 
-    // 2. Elementos del nivel (Réplica 1-1)
-    const levelItems = [
-        // Bloques interrogación y Ladrillos iniciales
-        [16, 9, '?'], [20, 9, 'B'], [21, 9, '?'], [22, 9, 'B'], [23, 9, '?'], [22, 5, '?'],
-        // Tuberías
+    const mapData = [
+        [16, 9, '?', 'dona'], [20, 9, 'B'], [21, 9, '?', 'duff'], [22, 9, 'B'], [23, 9, '?', 'dona'], [22, 5, '?', 'dona'],
         [28, 12, 'P', 2], [38, 12, 'P', 3], [46, 12, 'P', 4], [57, 12, 'P', 4],
-        // Bloques después de tuberías
-        [77, 9, 'B'], [78, 9, '?'], [79, 9, 'B'],
-        // Escalera final
+        [77, 9, 'B'], [78, 9, '?', 'star'], [79, 9, 'B'],
+        [94, 9, 'B'], [95, 5, 'B'], [96, 5, 'B'], [97, 5, 'B'],
+        [106, 9, 'B', 'multi'], [109, 9, 'B'], [109, 5, 'B'],
+        [120, 9, 'B'], [121, 9, 'B'], [122, 9, 'B'],
         [134, 12, 'S', 1], [135, 12, 'S', 2], [136, 12, 'S', 3], [137, 12, 'S', 4],
         [140, 12, 'S', 4], [141, 12, 'S', 3], [142, 12, 'S', 2], [143, 12, 'S', 1],
-        // Mástil
-        [160, 12, 'FLAG']
+        [198, 12, 'HOUSE'] 
     ];
 
-    levelItems.forEach(m => {
+    mapData.forEach(m => {
         let bx = m[0] * GRID;
-        if(m[2] === 'P') { // Tuberías
-            for(let h=0; h<m[3]; h++) blocks.push({x: bx, y: gY - ((h+1)*GRID), w: GRID*2, h: GRID, t: 'P'});
-        } else if(m[2] === 'S') { // Escaleras
-            for(let h=0; h<m[3]; h++) blocks.push({x: bx, y: gY - ((h+1)*GRID), w: GRID, h: GRID, t: 'S'});
-        } else if(m[2] === 'FLAG') { // Bandera
-            blocks.push({x: bx, y: gY - (GRID*8), w: 10, h: GRID*8, t: 'FLAG'});
-        } else { // Bloques
-            let by = gY - ((13 - m[1]) * GRID);
-            blocks.push({x: bx, y: by, w: GRID, h: GRID, t: m[2]});
-        }
+        if(m[2] === 'P') { for(let h=0; h<m[3]; h++) blocks.push({x: bx, y: gY-((h+1)*GRID), w: GRID*2, h: GRID, t: 'P'}); }
+        else if(m[2] === 'S') { for(let h=0; h<m[3]; h++) blocks.push({x: bx, y: gY-((h+1)*GRID), w: GRID, h: GRID, t: 'S'}); }
+        else if(m[2] === 'HOUSE') { blocks.push({x: bx, y: gY-160, w: 160, h: 160, t: 'HOUSE'}); }
+        else { blocks.push({x: bx, y: gY-((13-m[1])*GRID), w: GRID, h: GRID, t: m[2], item: m[3], hits: m[3]==='multi'?5:1}); }
     });
 
-    // 3. Enemigos (Flanders)
-    [22, 40, 51, 80, 97, 114].forEach(ex => {
-        enemies.push({x: ex*GRID, y: gY - GRID, vx: -1.5, w: 35, h: 35});
-    });
+    [22, 40, 51, 80, 97, 114, 124, 128].forEach(ex => enemies.push({x: ex*GRID, y: gY-40, vx: -1.5}));
+
+    p.y = gY - 100;
+    loop();
 }
 
 function update() {
     if(!active) return;
+    if (keys.left) p.vx = -4.5; else if (keys.right) p.vx = 4.5; else p.vx *= 0.8;
+    p.vy += 0.85; p.x += p.vx; p.y += p.vy;
+    if(p.x > camX + 200) camX = p.x - 200;
+    if(p.star > 0) p.star--;
 
-    // Movimiento
-    if (keys.left) p.vx = -4.5;
-    else if (keys.right) p.vx = 4.5;
-    else p.vx *= 0.8;
-
-    p.vy += 0.8;
-    p.x += p.vx;
-    p.y += p.vy;
-
-    // Cámara
-    if(p.x > camX + (canvas.width/3)) camX = p.x - (canvas.width/3);
-    if(camX < 0) camX = 0;
-
-    // Colisiones
     p.ground = false;
     blocks.forEach(b => {
         if (p.x + p.w > b.x && p.x < b.x + b.w && p.y + p.h > b.y && p.y < b.y + b.h) {
-            if(b.t === 'FLAG') { active = false; document.getElementById('overlay').style.display="flex"; document.getElementById('msg-title').innerText="¡EXCELENTE!"; }
-            if (p.vy > 0 && p.y + p.h - p.vy <= b.y) {
-                p.y = b.y - p.h; p.vy = 0; p.ground = true;
-            } else if (p.vx > 0 && p.x < b.x) p.x = b.x - p.w;
-            else if (p.vx < 0 && p.x > b.x) p.x = b.x + b.w;
+            if(b.t === 'HOUSE') { active=false; document.getElementById('overlay').style.display="flex"; document.getElementById('msg-title').innerText="¡HOGAR, DULCE HOGAR!"; return; }
+            if (p.vy > 0 && p.y + p.h - p.vy <= b.y) { p.y = b.y - p.h; p.vy = 0; p.ground = true; }
+            else if (p.vy < 0 && p.y - p.vy >= b.y + b.h) {
+                p.y = b.y + b.h; p.vy = 1;
+                if(b.t === '?' || b.t === 'B') {
+                    if(b.item === 'duff') items.push({x: b.x, y: b.y-GRID, t:'🍺'});
+                    if(b.item === 'star') items.push({x: b.x, y: b.y-GRID, t:'⭐'});
+                    if(b.item === 'dona' || b.item === 'multi') { coins++; document.getElementById('donas').innerText = coins; }
+                    if(b.hits > 1) b.hits--; else b.t = 'U';
+                }
+            } else { if(p.vx > 0) p.x = b.x - p.w; else if(p.vx < 0) p.x = b.x + b.w; }
         }
     });
 
-    // Muerte por caída o Flanders
-    if(p.y > canvas.height) resetGame();
     enemies.forEach((en, i) => {
         en.x += en.vx;
-        if(Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 30) {
-            if(p.vy > 0) { enemies.splice(i, 1); p.vy = -10; }
-            else resetGame();
+        if(Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 35) {
+            if(p.vy > 0 || p.star > 0) { enemies.splice(i, 1); if(p.vy > 0) p.vy = -10; }
+            else { if(p.isSuper) { p.isSuper=false; p.h=42; p.y-=10; } else reset(); }
         }
     });
 
-    frameCount++;
-    if(frameCount % 60 === 0) {
-        timeLeft--;
-        document.getElementById('timer').innerText = timeLeft;
-    }
+    items.forEach((it, i) => {
+        it.y += 2;
+        if(Math.abs(p.x-it.x)<40 && Math.abs(p.y-it.y)<40) {
+            if(it.t==='🍺') { p.isSuper=true; p.h=65; }
+            if(it.t==='⭐') { p.star=600; }
+            items.splice(i,1);
+        }
+    });
+
+    if(p.y > canvas.height) reset();
 }
 
-function resetGame() {
-    active = false;
-    document.getElementById('overlay').style.display = "flex";
-}
+function reset() { active=false; document.getElementById('overlay').style.display="flex"; }
 
 function draw() {
     ctx.clearRect(0,0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.translate(-camX, 0);
-
+    ctx.save(); ctx.translate(-camX, 0);
     blocks.forEach(b => {
-        if(b.t==='G') ctx.fillStyle = '#944828';
-        else if(b.t==='P') ctx.fillStyle = '#27ae60';
-        else if(b.t==='B') ctx.fillStyle = '#e76e33';
-        else if(b.t==='S') ctx.fillStyle = '#bdc3c7';
-        else if(b.t==='FLAG') ctx.fillStyle = '#fff';
-        else ctx.fillStyle = '#f1c40f';
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        ctx.fillStyle = b.t==='G'?'#944828': b.t==='P'?'#27ae60': b.t==='B'?'#e76e33': b.t==='?'?'#f1c40f': b.t==='U'?'#7f8c8d':'#bdc3c7';
+        if(b.t === 'HOUSE') { ctx.font="150px Arial"; ctx.fillText("🏠", b.x, b.y+130); ctx.font="40px Arial"; ctx.fillText("👩‍👧‍👦", b.x+40, b.y+160); }
+        else { ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeRect(b.x, b.y, b.w, b.h); if(b.t==='?') ctx.fillText("?", b.x+15, b.y+25); }
     });
-
-    enemies.forEach(en => { ctx.font = "30px Arial"; ctx.fillText("👨‍🏫", en.x, en.y + 30); });
-
-    // Homero
-    ctx.font = "40px Arial";
+    enemies.forEach(en => { ctx.font="35px Arial"; ctx.fillText("👨‍🏫", en.x, en.y+35); });
+    items.forEach(it => { ctx.font="30px Arial"; ctx.fillText(it.t, it.x, it.y+30); });
+    ctx.font = p.h + "px Arial";
+    if(p.star > 0 && frameCount % 10 < 5) ctx.globalAlpha = 0.5;
     ctx.fillText("👨‍🦲", p.x, p.y + p.h);
-
     ctx.restore();
+    if(active && frameCount % 60 === 0) { timeLeft--; document.getElementById('timer').innerText = timeLeft; }
 }
 
-function loop() {
-    update();
-    draw();
-    if(active) requestAnimationFrame(loop);
-}
+let frameCount = 0;
+function loop() { frameCount++; update(); draw(); if(active) requestAnimationFrame(loop); }
 
-// Controles
-const setupControl = (id, key) => {
+const ctrl = (id, k) => {
     const el = document.getElementById(id);
-    el.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if(key === 'j') { if(p.ground) p.vy = -16; }
-        else keys[key] = true;
-    });
-    el.addEventListener('touchend', () => { if(key !== 'j') keys[key] = false; });
+    el.ontouchstart = (e) => { e.preventDefault(); if(k==='j') { if(p.ground) p.vy=-17; } else keys[k]=true; };
+    el.ontouchend = () => { if(k!=='j') keys[k]=false; };
 };
-
-setupControl('left', 'left');
-setupControl('right', 'right');
-setupControl('jump', 'j');
-
-document.getElementById('overlay').addEventListener('click', () => location.reload());
-
-// Iniciar al cargar
-window.onload = () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    buildMap();
-    loop();
-};
+ctrl('left', 'left'); ctrl('right', 'right'); ctrl('jump', 'j');
+window.onload = init;
 </script>
 </body>
 </html>
