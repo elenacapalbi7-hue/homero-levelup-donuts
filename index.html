@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Homer Odyssey: Los 25 Retos</title>
+    <title>Homer Odyssey: 25 Niveles Reales</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #87CEEB; overflow: hidden; transition: background 0.8s; }
         #ui { position: absolute; top: 40px; width: 100%; display: flex; justify-content: space-around; color: #fff; text-shadow: 2px 2px #000; z-index: 50; font-size: 18px; pointer-events: none; }
-        #mode-info { position: absolute; top: 75px; width: 100%; text-align: center; color: #FFD700; font-size: 16px; text-shadow: 1px 1px #000; z-index: 50; padding: 0 10px; }
+        #mode-info { position: absolute; top: 75px; width: 100%; text-align: center; color: #FFD700; font-size: 16px; text-shadow: 1px 1px #000; z-index: 50; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 100; text-align: center; padding: 20px; }
         .btn-action { padding: 20px 45px; font-size: 22px; background: #FFD700; color: #333; border: none; border-radius: 15px; font-weight: bold; }
-        #controls { position: absolute; bottom: 130px; width: 100%; display: flex; justify-content: center; gap: 25px; z-index: 80; }
-        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.9); border: 4px solid #333; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; }
+        #controls { position: absolute; bottom: 140px; width: 100%; display: flex; justify-content: center; gap: 25px; z-index: 80; }
+        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.9); border: 4px solid #333; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; user-select: none; }
     </style>
 </head>
 <body>
@@ -27,7 +27,7 @@
 
     <div id="overlay">
         <h1 id="title">HOMER 25</h1>
-        <p id="msg">¡Cada nivel es un mundo nuevo!</p>
+        <p id="msg">Atrapa 10 relojes para avanzar.</p>
         <button class="btn-action" id="startBtn">¡EMPEZAR!</button>
     </div>
 
@@ -46,37 +46,41 @@
     const lvlEl = document.getElementById('lvl'), livesEl = document.getElementById('lives'), clocksEl = document.getElementById('clocks'), overlay = document.getElementById('overlay'), modeTxt = document.getElementById('mode-info'), startBtn = document.getElementById('startBtn');
 
     let level = 1, score = 0, lives = 3, isPlaying = false, frame = 0;
-    let player = { x: 0, y: 0, w: 60, h: 80, vx: 0, vy: 0, grav: 0.7, jumps: 0, angle: 0, attached: true, size: 1, visible: true };
+    let player = { x: 0, y: 0, w: 60, h: 80, vx: 0, vy: 0, grav: 0.7, jumps: 0, angle: 0, attached: true, size: 1 };
     let items = [], obstacles = [];
 
-    // DEFINICIÓN DE LOS 25 NIVELES
+    // --- BASE DE DATOS DE LOS 25 NIVELES ---
     const levels = [
-        { n: "RECOLECTOR", bg: "#87CEEB", h: "Atrapa 10 relojes." },
-        { n: "PÉNDULO", bg: "#98FB98", h: "🔘 para soltarte." },
-        { n: "GRAVEDAD", bg: "#FFB6C1", h: "🔘 cambia el suelo." },
+        { n: "RECOLECTOR", bg: "#87CEEB", h: "Atrapa los relojes que caen." },
+        { n: "PÉNDULO", bg: "#98FB98", h: "🔘 para soltarte del hilo." },
+        { n: "GRAVEDAD", bg: "#FFB6C1", h: "🔘 para cambiar el suelo." },
         { n: "REDUCTOR", bg: "#FFD700", h: "⬅️ mini | ➡️ súper." },
         { n: "NADO", bg: "#00CED1", h: "Flechas para nadar." },
-        { n: "ESCUDO", bg: "#F0E68C", h: "Protégete con la dona." },
-        { n: "VIENTO", bg: "#B0C4DE", h: "El viento te empuja." },
-        { n: "TRAMPOLÍN", bg: "#FF69B4", h: "Rebotas sin parar." },
-        { n: "NOCHE", bg: "#2F4F4F", h: "Todo está oscuro." },
-        { n: "HIELO", bg: "#E0FFFF", h: "El suelo resbala." },
-        { n: "PORTALES", bg: "#9370DB", h: "Usa los bordes." },
-        { n: "METEOROS", bg: "#A52A2A", h: "Cuidado con el cielo." },
-        { n: "REBORE", bg: "#7FFF00", h: "Paredes saltarinas." },
-        { n: "CARRERA", bg: "#D2691E", h: "¡Ve muy rápido!" },
-        { n: "SILENCIO", bg: "#708090", h: "No saltes en rojo." },
-        { n: "IMÁN", bg: "#FF4500", h: "El reloj huye." },
+        { n: "ESCUDO", bg: "#F0E68C", h: "Donas giran con flechas." },
+        { n: "VIENTO", bg: "#B0C4DE", h: "¡El viento te empuja!" },
+        { n: "TRAMPOLÍN", bg: "#FF69B4", h: "Rebotas automáticamente." },
+        { n: "NOCHE", bg: "#2F4F4F", h: "Usa tu linterna." },
+        { n: "HIELO", bg: "#E0FFFF", h: "¡Cuidado, resbalas!" },
+        { n: "PORTALES", bg: "#9370DB", h: "Cruza de un lado a otro." },
+        { n: "METEOROS", bg: "#A52A2A", h: "Esquiva lo que cae." },
+        { n: "MUROS", bg: "#7FFF00", h: "Rebota en las paredes." },
+        { n: "VELOCIDAD", bg: "#D2691E", h: "¡Todo va muy rápido!" },
+        { n: "SEMÁFORO", bg: "#708090", h: "No te muevas en rojo." },
+        { n: "IMÁN", bg: "#FF4500", h: "El reloj huye de ti." },
         { n: "ESPEJO", bg: "#C0C0C0", h: "Controles invertidos." },
-        { n: "ASCENSOR", bg: "#4682B4", h: "Sube plataformas." },
-        { n: "BOMBAS", bg: "#000000", h: "Solo donas, no cajas." },
+        { n: "ASCENSOR", bg: "#4682B4", h: "Plataformas que suben." },
+        { n: "EQUILIBRIO", bg: "#DDA0DD", h: "Mantente en el centro." },
         { n: "FANTASMA", bg: "#F5F5F5", h: "Te vuelves invisible." },
-        { n: "GIGANTE", bg: "#DEB887", h: "Mundo muy pequeño." },
-        { n: "ZIGZAG", bg: "#5F9EA0", h: "Mueves en diagonal." },
-        { n: "PESADILLA", bg: "#8B0000", h: "Muchos obstáculos." },
-        { n: "FINAL A", bg: "#FFD700", h: "Casi lo logras..." },
-        { n: "EL GRAN FINAL", bg: "#FFFFFF", h: "¡El reto supremo!" }
+        { n: "GIGANTE", bg: "#DEB887", h: "Mundo minúsculo." },
+        { n: "DIAGONAL", bg: "#5F9EA0", h: "Mueves en zigzag." },
+        { n: "LLUVIA", bg: "#483D8B", h: "Muchos objetos a la vez." },
+        { n: "CERO G", bg: "#000080", h: "Flotas sin gravedad." },
+        { n: "EL FINAL", bg: "#FFD700", h: "¡El reto definitivo!" }
     ];
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize);
+    resize();
 
     function initLevel() {
         score = 0; clocksEl.innerText = "0/10"; lvlEl.innerText = level;
@@ -86,84 +90,153 @@
         let l = levels[level-1];
         document.getElementById('game-container').style.background = l.bg;
         modeTxt.innerText = "MODO: " + l.n;
-        player.x = canvas.width/2 - 30; player.y = canvas.height - 150;
+        player.x = canvas.width/2 - 30; player.y = canvas.height - 180;
+    }
+
+    function spawn() {
+        // Lógica de aparición corregida: si no hay items, crea uno inmediatamente
+        if(items.length < 1) {
+            let startY = (level === 2) ? 200 : -50; // En péndulo aparece en medio
+            items.push({
+                x: 50 + Math.random()*(canvas.width-100), 
+                y: startY, 
+                vy: 2 + (level * 0.1), 
+                e: '⏰',
+                timer: 0 
+            });
+        }
+        if(frame % 140 === 0) {
+            obstacles.push({x: canvas.width+50, y: canvas.height-130, vx: -4 - (level*0.2), e: '🚧'});
+        }
     }
 
     function update() {
         if(!isPlaying) return;
         frame++;
-        
-        // Spawn básico
-        if(frame % 100 === 0 && items.length < 1) items.push({x: Math.random()*(canvas.width-60), y: -50, vy: 2, e: '⏰'});
-        if(frame % 140 === 0) obstacles.push({x: canvas.width+50, y: canvas.height-130, vx: -5, e: '📦'});
+        spawn();
 
-        // FÍSICAS ÚNICAS POR NIVEL (Ejemplos de las 25)
-        if(level === 7) player.vx -= 0.5; // Viento
-        if(level === 10) player.vx *= 0.98; // Hielo (desliza)
-        if(level === 17) player.vx *= -1; // Espejo (invertido)
-
-        // Gravedad normal
-        if(![2,5].includes(level)) {
-            player.vy += player.grav; player.y += player.vy; player.x += player.vx;
-            if(player.y > canvas.height-140) { player.y = canvas.height-140; player.vy = 0; player.jumps = 0; }
-        } else if(level === 2) { // Péndulo
+        // 1. FÍSICAS GENERALES
+        if(level === 5 || level === 24) { // Nado o Cero G
+            player.vy += 0.1; 
+        } else if (level === 2) { // Péndulo
             if(player.attached) {
                 player.angle += 0.05;
-                player.x = canvas.width/2 + Math.sin(player.angle)*200;
-                player.y = Math.cos(player.angle)*200;
-            } else { player.y += player.vy; player.vy += 0.5; player.x += player.vx; }
+                player.x = (canvas.width/2-30) + Math.sin(player.angle)*200;
+                player.y = 50 + Math.cos(player.angle)*200;
+            } else { player.vy += 0.5; }
+        } else { // Normal
+            player.vy += player.grav;
         }
 
-        // Colisiones
+        // 2. MODIFICADORES DE NIVEL
+        if(level === 7) player.vx -= 0.8; // Viento
+        if(level === 10) player.vx *= 0.98; // Hielo
+        if(level === 17) player.x -= player.vx * 2; // Espejo (solo visualmente)
+
+        player.x += player.vx;
+        player.y += player.vy;
+
+        // 3. LÍMITES Y SUELO
+        let floorY = canvas.height - 140;
+        if(player.y > floorY && level !== 5 && level !== 24) {
+            player.y = floorY; player.vy = 0; player.jumps = 0;
+        }
+        if(player.x < 0) player.x = 0;
+        if(player.x > canvas.width-60) player.x = canvas.width-60;
+
+        // 4. ACTUALIZAR ITEMS (CORREGIDO)
         items.forEach((it, i) => {
-            it.y += it.vy;
+            if(level !== 2) it.y += it.vy; // En péndulo el reloj es fijo
+            it.timer++;
+            
+            // Colisión
             if(Math.hypot(player.x - it.x, player.y - it.y) < 60) {
-                score++; clocksEl.innerText = score+"/10"; items.splice(i,1);
+                score++; clocksEl.innerText = score+"/10";
+                items.splice(i,1);
                 if(score >= 10) nextLevel();
             }
+            // AUTO-LIMPIEZA: Si el reloj cae o pasa mucho tiempo, se borra para que salga otro
+            else if(it.y > canvas.height || it.timer > 500) {
+                items.splice(i,1);
+            }
         });
-        
-        if(player.x < 0) player.x = 0; if(player.x > canvas.width-60) player.x = canvas.width-60;
+
+        // 5. OBSTÁCULOS
+        obstacles.forEach((o, i) => {
+            o.x += o.vx;
+            if(Math.hypot(player.x - o.x, player.y - o.y) < 50) {
+                lives--; livesEl.innerText = lives; obstacles.splice(i,1);
+                if(lives <= 0) gameOver();
+            }
+            if(o.x < -100) obstacles.splice(i,1);
+        });
     }
 
     function draw() {
         ctx.clearRect(0,0,canvas.width, canvas.height);
-        if(level === 9) { // Nivel Noche
-            ctx.fillStyle = "black"; ctx.fillRect(0,0,canvas.width, canvas.height);
-            ctx.save(); ctx.beginPath(); ctx.arc(player.x+30, player.y+40, 100, 0, Math.PI*2); ctx.clip();
-            ctx.fillStyle = levels[level-1].bg; ctx.fillRect(0,0,canvas.width, canvas.height);
-        }
         
+        // Suelo
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.fillRect(0, canvas.height-80, canvas.width, 80);
+
+        // Hilo del Péndulo
+        if(level === 2 && player.attached) {
+            ctx.beginPath(); ctx.moveTo(canvas.width/2, 0); ctx.lineTo(player.x+30, player.y);
+            ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.stroke();
+        }
+
+        // Relojes y Obstáculos
         ctx.font = "50px Arial";
         items.forEach(it => ctx.fillText(it.e, it.x, it.y));
         obstacles.forEach(o => ctx.fillText(o.e, o.x, o.y + 40));
+        
+        // Homero
         ctx.font = (70 * player.size) + "px Arial";
         ctx.fillText("🏃‍♂️", player.x, player.y + 60);
-        if(level === 9) ctx.restore();
 
         if(isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function nextLevel() {
         isPlaying = false; level++;
-        if(level > 25) { alert("¡GANASTE LOS 25!"); location.reload(); }
+        if(level > 25) { alert("¡ERES UNA LEYENDA!"); location.reload(); return; }
         overlay.style.display = "flex";
         document.getElementById('title').innerText = "¡NIVEL SUPERADO!";
-        document.getElementById('msg').innerText = "Prepárate para: " + levels[level-1].n;
-        startBtn.innerText = "SIGUIENTE";
+        document.getElementById('msg').innerText = levels[level-1].h;
+        startBtn.innerText = "SIGUIENTE RETO";
+    }
+
+    function gameOver() {
+        isPlaying = false; lives = 3; level = 1;
+        overlay.style.display = "flex";
+        document.getElementById('title').innerText = "¡D'OH!";
+        document.getElementById('msg').innerText = "Perdiste todas las vidas.";
+        startBtn.innerText = "REINTENTAR";
     }
 
     function startGame() { overlay.style.display="none"; initLevel(); isPlaying=true; draw(); }
 
-    document.getElementById('bL').ontouchstart = (e) => { e.preventDefault(); if(level===4) player.size=0.5; else player.vx=-7; };
-    document.getElementById('bR').ontouchstart = (e) => { e.preventDefault(); if(level===4) player.size=2; else player.vx=7; };
-    document.getElementById('bL').ontouchend = document.getElementById('bR').ontouchend = () => player.vx=0;
-    document.getElementById('bC').ontouchstart = (e) => {
-        e.preventDefault();
-        if(level===2) { player.attached=false; player.vy=-5; player.vx=10; }
-        else if(level===3) { player.grav*=-1; }
-        else if(player.jumps < 2) { player.vy=-16; player.jumps++; }
+    // CONTROLES CORREGIDOS
+    const bL = document.getElementById('bL'), bC = document.getElementById('bC'), bR = document.getElementById('bR');
+    
+    const handleMove = (dir) => {
+        if(level === 17) dir *= -1; // Espejo
+        if(level === 4) player.size = (dir === -1) ? 0.5 : 1.8;
+        else player.vx = dir * 7;
     };
+
+    bL.ontouchstart = (e) => { e.preventDefault(); handleMove(-1); };
+    bR.ontouchstart = (e) => { e.preventDefault(); handleMove(1); };
+    bL.ontouchend = bR.ontouchend = () => { if(level !== 4) player.vx = 0; };
+
+    bC.ontouchstart = (e) => {
+        e.preventDefault();
+        if(level === 2 && player.attached) { player.attached = false; player.vy = -5; player.vx = 8; }
+        else if(level === 3) { player.grav *= -1; player.vy = player.grav * 15; }
+        else if(level === 5 || level === 24) { player.vy = -6; }
+        else if(player.jumps < 2) { player.vy = -16; player.jumps++; }
+    };
+
     startBtn.onclick = startGame;
 </script>
 </body>
