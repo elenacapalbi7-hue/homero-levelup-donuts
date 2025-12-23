@@ -3,81 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Homer: Nivel 1 - Limpieza de Garaje</title>
+    <title>Homer Runner - Nivel 2</title>
     <style>
         body { margin: 0; background: #222; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #87CEEB; overflow: hidden; }
         
-        #game-container { 
-            position: relative; 
-            width: 100vw; 
-            height: 100vh; 
-            background: #87CEEB; 
-            overflow: hidden;
-        }
-
+        /* UI SUPERIOR */
         #ui {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            display: flex;
-            justify-content: space-around;
-            color: white;
-            text-shadow: 2px 2px #000;
-            z-index: 10;
-            font-size: 20px;
-            pointer-events: none;
+            position: absolute; top: 20px; width: 100%;
+            display: flex; justify-content: space-around;
+            color: white; text-shadow: 2px 2px #000; z-index: 10; font-size: 20px;
         }
 
+        /* PANTALLA MENSAJES */
         #overlay {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 100;
-            text-align: center;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: white; z-index: 100; text-align: center;
         }
 
         .btn-action {
-            padding: 20px 60px;
-            font-size: 28px;
-            background: #FFD700;
-            color: #333;
-            border: none;
-            border-radius: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 6px #b8860b;
+            padding: 20px 60px; font-size: 28px; background: #4CAF50; color: white;
+            border: none; border-radius: 15px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 6px #2e7d32;
         }
 
-        /* CONTROLES ELEVADOS PARA EVITAR GESTOS DEL SISTEMA */
+        /* CONTROLES ELEVADOS (BOTÓN DE SALTO ÚNICO) */
         #controls {
-            position: absolute;
-            bottom: 120px; /* Bien arriba de la barra de inicio */
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            padding: 0 40px;
-            box-sizing: border-box;
-            z-index: 20;
+            position: absolute; bottom: 120px; width: 100%;
+            display: flex; justify-content: center; z-index: 20;
         }
 
-        .touch-btn {
-            width: 90px;
-            height: 90px;
-            background: rgba(255, 255, 255, 0.3);
-            border: 4px solid white;
-            border-radius: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 40px;
-            color: white;
-            user-select: none;
+        .jump-btn {
+            width: 120px; height: 120px; background: rgba(255, 255, 255, 0.4);
+            border: 5px solid white; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 50px; color: white; user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -88,30 +49,27 @@
 
 <div id="game-container">
     <div id="ui">
-        <div>🍩 <span id="score">0</span> / 15</div>
+        <div>⏰ <span id="clocks">0</span> / 10</div>
         <div>❤️ <span id="lives">3</span></div>
     </div>
 
     <div id="overlay">
-        <h1 id="title">NIVEL 1</h1>
-        <div id="message">
-            <p>¡Atrapa 15 donas!<br>Esquiva la chatarra del garaje.</p>
-        </div>
-        <button class="btn-action" id="mainBtn">¡EMPEZAR!</button>
+        <h1 id="title">NIVEL 2</h1>
+        <p id="msg">¡Llega a la Planta!<br>Salta los obstáculos.<br>Atrapa 10 relojes.</p>
+        <button class="btn-action" id="mainBtn">¡CORRER!</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <div id="controls">
-        <div class="touch-btn" id="btnLeft">⬅️</div>
-        <div class="touch-btn" id="btnRight">➡️</div>
+        <div class="jump-btn" id="btnJump">⬆️</div>
     </div>
 </div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('score');
+    const clocksEl = document.getElementById('clocks');
     const livesEl = document.getElementById('lives');
     const overlay = document.getElementById('overlay');
     const mainBtn = document.getElementById('mainBtn');
@@ -120,72 +78,81 @@
     let score = 0;
     let lives = 3;
     let frameCount = 0;
-    let items = [];
-    let keys = { left: false, right: false };
+    let obstacles = [];
+    let gameSpeed = 4; // Velocidad moderada para niños
 
-    const player = { x: 0, y: 0, w: 70, h: 90, speed: 9, emoji: "👨‍🦲" };
-    const obstacles = ['💿', '📦', '🛞', '🥫', '👢', '🚲']; // Chatarra: CD, Caja, Neumático, Lata, Bota, Bici
+    const player = {
+        x: 50, y: 0, w: 70, h: 90,
+        vy: 0, gravity: 0.8, jumpPower: -16,
+        grounded: false, emoji: "🏃‍♂️"
+    };
+
+    const hazardEmojis = ['🗑️', '🚨', '📦', '🚧']; // Bote, cono, caja, valla
 
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        player.y = canvas.height - player.h - 30;
-        player.x = canvas.width / 2 - player.w / 2;
+        player.y = canvas.height - player.h - 40;
     }
-
     window.addEventListener('resize', resize);
     resize();
 
-    function spawnItem() {
+    function spawnObstacle() {
         const rand = Math.random();
-        let type, emoji, speed;
-
-        if (rand < 0.1) { // 10% Sándwich
-            type = 'power'; emoji = '🥪'; speed = 7;
-        } else if (rand < 0.5) { // 40% Chatarra
-            type = 'bad'; 
-            emoji = obstacles[Math.floor(Math.random() * obstacles.length)];
-            speed = 4 + Math.random() * 4;
-        } else { // 50% Donas
-            type = 'good'; emoji = '🍩'; speed = 4 + Math.random() * 3;
+        let type, emoji;
+        
+        if (rand < 0.3) { // 30% Relojes
+            type = 'good'; emoji = '⏰';
+        } else { // 70% Obstáculos
+            type = 'bad'; emoji = hazardEmojis[Math.floor(Math.random() * hazardEmojis.length)];
         }
 
-        items.push({ x: Math.random() * (canvas.width - 50), y: -50, size: 50, type, emoji, speed });
+        obstacles.push({
+            x: canvas.width + 50,
+            y: type === 'good' ? canvas.height - 150 - Math.random() * 100 : canvas.height - 80,
+            size: 50, type, emoji
+        });
     }
 
     function update() {
         if (!isPlaying) return;
 
-        if (keys.left && player.x > 0) player.x -= player.speed;
-        if (keys.right && player.x < canvas.width - player.w) player.x += player.speed;
+        // Física de salto
+        player.vy += player.gravity;
+        player.y += player.vy;
 
-        if (frameCount % 45 === 0) spawnItem();
+        const groundY = canvas.height - player.h - 40;
+        if (player.y > groundY) {
+            player.y = groundY;
+            player.vy = 0;
+            player.grounded = true;
+        }
 
-        for (let i = items.length - 1; i >= 0; i--) {
-            let it = items[i];
-            it.y += it.speed;
+        // Generar obstáculos
+        if (frameCount % 100 === 0) spawnObstacle();
+
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let ob = obstacles[i];
+            ob.x -= gameSpeed;
 
             // Colisión
-            if (player.x < it.x + it.size && player.x + player.w > it.x &&
-                player.y < it.y + it.size && player.y + player.h > it.y) {
+            if (player.x < ob.x + ob.size - 10 && player.x + player.w - 10 > ob.x &&
+                player.y < ob.y + ob.size - 10 && player.y + player.h > ob.y) {
                 
-                if (it.type === 'good') {
+                if (ob.type === 'good') {
                     score++;
-                    scoreEl.innerText = score;
-                    if (score >= 15) win();
-                } else if (it.type === 'bad') {
+                    clocksEl.innerText = score;
+                    if (score >= 10) win();
+                } else {
                     lives--;
                     livesEl.innerText = lives;
                     if (lives <= 0) die();
-                } else if (it.type === 'power') {
-                    player.speed = 15;
-                    setTimeout(() => player.speed = 9, 4000);
                 }
-                items.splice(i, 1);
+                obstacles.splice(i, 1);
                 continue;
             }
 
-            if (it.y > canvas.height) items.splice(i, 1);
+            if (ob.x < -100) obstacles.splice(i, 1);
         }
         frameCount++;
     }
@@ -193,45 +160,43 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Suelo
-        ctx.fillStyle = "#555";
-        ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+        // Suelo (Calle)
+        ctx.fillStyle = "#666";
+        ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+        ctx.fillStyle = "yellow";
+        for(let i=0; i<10; i++) ctx.fillRect((i*100) - (frameCount*gameSpeed % 100), canvas.height-25, 40, 5);
 
-        // Jugador
+        // Personaje
         ctx.font = player.h + "px Arial";
         ctx.fillText(player.emoji, player.x, player.y + player.h);
 
-        // Items
-        items.forEach(it => {
-            ctx.font = it.size + "px Arial";
-            ctx.fillText(it.emoji, it.x, it.y + it.size);
+        // Obstáculos
+        obstacles.forEach(ob => {
+            ctx.font = ob.size + "px Arial";
+            ctx.fillText(ob.emoji, ob.x, ob.y + ob.size);
         });
 
         if (isPlaying) requestAnimationFrame(() => { update(); draw(); });
     }
 
     function startGame() {
-        score = 0; lives = 3; items = []; frameCount = 0;
-        scoreEl.innerText = score; livesEl.innerText = lives;
+        score = 0; lives = 3; obstacles = []; frameCount = 0;
+        clocksEl.innerText = score; livesEl.innerText = lives;
         overlay.style.display = "none";
         isPlaying = true;
         draw();
     }
 
     function die() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡D'OH!"; }
-    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡GANASTE!"; }
+    function win() { isPlaying = false; overlay.style.display = "flex"; document.getElementById('title').innerText = "¡EXCELENTE!"; document.getElementById('msg').innerText = "Llegaste a la planta a tiempo."; }
 
-    // Eventos de botones
     mainBtn.onclick = startGame;
 
-    const ctrl = (id, k) => {
-        const el = document.getElementById(id);
-        el.ontouchstart = (e) => { e.preventDefault(); keys[k] = true; };
-        el.ontouchend = () => keys[k] = false;
-        el.onmousedown = () => keys[k] = true;
-        el.onmouseup = () => keys[k] = false;
-    };
-    ctrl('btnLeft', 'left'); ctrl('btnRight', 'right');
+    // Control de salto
+    const jumpAction = () => { if (player.grounded && isPlaying) { player.vy = player.jumpPower; player.grounded = false; } };
+    document.getElementById('btnJump').ontouchstart = (e) => { e.preventDefault(); jumpAction(); };
+    document.onmousedown = (e) => { if(e.target.id !== 'mainBtn') jumpAction(); };
+    window.onkeydown = (e) => { if(e.code === 'Space' || e.key === 'ArrowUp') jumpAction(); };
 </script>
 </body>
 </html>
