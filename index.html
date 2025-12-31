@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Homer Odyssey - Kids Edition</title>
+    <title>Homer Odyssey - 5 Niveles Reales</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
         #game-wrap { position: relative; width: 100vw; height: 100vh; background: #050510; }
@@ -17,7 +17,7 @@
             width: 120px; height: 120px; background: rgba(255, 215, 0, 0.4); 
             border: 5px solid #FFD700; border-radius: 50%; 
             display: flex; justify-content: center; align-items: center; 
-            font-size: 50px; z-index: 100; touch-action: none;
+            font-size: 50px; z-index: 100; touch-action: none; box-shadow: 0 0 20px rgba(255,215,0,0.2);
         }
 
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
@@ -40,7 +40,7 @@
 
     <div id="overlay">
         <h1 id="m-title">HOMER DASH</h1>
-        <p id="m-desc">¡Diviértete!</p>
+        <p id="m-desc">¡Atrapa las donas!</p>
         <button class="start-btn" onclick="init()">JUGAR</button>
     </div>
 </div>
@@ -51,7 +51,7 @@
     
     let level = 1, donuts = 0, lives = 3, active = false, frame = 0;
     let player = { x: 50, y: 0, w: 50, h: 60, vy: 0, jumps: 0, g: 0.7, speed: 6, side: 1, isGiant: false };
-    let objects = [];
+    let objects = [], particles = [];
     let isPressing = false;
 
     function setup() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -59,49 +59,56 @@
     setup();
 
     function createLevel(lvl) {
-        donuts = 0; frame = 0; objects = [];
+        donuts = 0; frame = 0; objects = []; particles = [];
         document.getElementById('txt-donuts').innerText = "0/10";
         document.getElementById('txt-lvl').innerText = lvl;
         
-        player.x = 100; 
-        player.y = canvas.height - 160; 
-        player.vy = 0; 
-        player.jumps = 0; 
-        player.side = 1;
-        player.isGiant = false;
+        player.x = 100; player.y = canvas.height - 160; player.vy = 0; player.jumps = 0; 
+        player.side = 1; player.isGiant = false;
         player.speed = (lvl === 5) ? 9 : 6;
 
         const btn = document.getElementById('action-btn');
-        if(lvl === 1) btn.innerText = "⬆️";
-        if(lvl === 2) btn.innerText = "🍄";
-        if(lvl === 3) btn.innerText = "🚀";
-        if(lvl === 4) btn.innerText = "🔄";
-        if(lvl === 5) btn.innerText = "🏃";
+        btn.innerText = ["", "⬆️", "🍄", "🚀", "🔄", "🏃"][lvl];
 
         let startX = (lvl === 3) ? 1200 : 600; 
         for(let i=0; i<15; i++) spawnElement(startX + (i * 450));
     }
 
     function spawnElement(x) {
-        objects.push({ x: x + 150, y: canvas.height - 300, w: 50, h: 50, type: 'donut' });
+        // DONAS MÁS BAJAS PARA PODER AGARRARLAS FÁCIL
+        let donutY = (level === 3) ? canvas.height / 2 : canvas.height - 210;
+        objects.push({ x: x + 200, y: donutY, w: 50, h: 50, type: 'donut' });
 
         if (level === 1) { 
             objects.push({ x: x, y: canvas.height - 160, w: 60, h: 60, type: 'spike' });
         } 
-        else if (level === 2) { // MUROS DE LADRILLO (Para romper siendo gigante)
-            objects.push({ x: x, y: canvas.height - 220, w: 50, h: 120, type: 'brick' });
+        else if (level === 2) { 
+            // SECUENCIA NO REPETIDA: Alturas y anchos variables
+            let h = 80 + Math.random() * 100;
+            objects.push({ x: x, y: canvas.height - 100 - h, w: 40 + Math.random()*40, h: h, type: 'brick' });
         }
         else if (level === 3) { 
-            let gap = 280;
-            let topH = 50 + Math.random() * 200;
+            let gap = 280; let topH = 50 + Math.random() * 200;
             objects.push({ x: x, y: 0, w: 60, h: topH, type: 'hazard' });
             objects.push({ x: x, y: topH + gap, w: 60, h: canvas.height, type: 'hazard' });
         }
         else if (level === 4) { 
-            objects.push({ x: x, y: (x % 900 === 0) ? canvas.height - 160 : 100, w: 60, h: 60, type: 'hazard' });
+            objects.push({ x: x, y: (Math.random() > 0.5) ? canvas.height - 160 : 100, w: 60, h: 60, type: 'hazard' });
         }
         else if (level === 5) { 
             objects.push({ x: x, y: canvas.height - 160, w: 40, h: 60, type: 'hazard' });
+        }
+    }
+
+    function createExplosion(x, y) {
+        for(let i=0; i<8; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 1) * 10,
+                size: 5 + Math.random() * 10,
+                life: 30
+            });
         }
     }
 
@@ -110,28 +117,22 @@
         frame++;
         player.x += player.speed;
 
-        // NIVEL 2: GIGANTE
         if(level === 2) {
             player.isGiant = isPressing;
-            player.y = player.isGiant ? canvas.height - 230 : canvas.height - 160;
-            player.h = player.isGiant ? 130 : 60;
-            player.w = player.isGiant ? 100 : 50;
+            player.h = player.isGiant ? 120 : 60;
+            player.y = canvas.height - 100 - player.h;
         } else if (level === 3) { 
             if(isPressing) player.vy = -7; else player.vy += 0.5;
             player.y += player.vy;
         } else if (level === 4) { 
-            player.vy += (0.8 * player.side);
-            player.y += player.vy;
+            player.vy += (0.8 * player.side); player.y += player.vy;
         } else { 
-            player.vy += player.g;
-            player.y += player.vy;
+            player.vy += player.g; player.y += player.vy;
         }
 
         const groundY = canvas.height - 100;
-        if (level !== 2) {
-            if (player.y + player.h > groundY) {
-                player.y = groundY - player.h; player.vy = 0; player.jumps = 0;
-            }
+        if (level !== 2 && level !== 3 && level !== 4) {
+            if (player.y + player.h > groundY) { player.y = groundY - player.h; player.vy = 0; player.jumps = 0; }
         }
         if (player.y < 0) { player.y = 0; player.vy = 0; }
 
@@ -143,16 +144,21 @@
                     donuts++; objects.splice(i, 1);
                     document.getElementById('txt-donuts').innerText = donuts + "/10";
                     if(donuts >= 10) win();
-                } else if (obj.type === 'brick') {
-                    if(player.isGiant) { objects.splice(i, 1); } // Rompe el muro
-                    else { die(); } // Muere por pequeño
+                } else if (obj.type === 'brick' && player.isGiant) {
+                    createExplosion(obj.x, obj.y + obj.h/2);
+                    objects.splice(i, 1);
                 } else { die(); }
             }
         });
 
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.vy += 0.5; p.life--;
+            if(p.life <= 0) particles.splice(i, 1);
+        });
+
         if (frame % 60 === 0) {
             let lastX = objects.length > 0 ? objects[objects.length-1].x : player.x + 500;
-            spawnElement(lastX + 450);
+            spawnElement(lastX + (400 + Math.random() * 200));
         }
     }
 
@@ -172,7 +178,7 @@
 
         objects.forEach(obj => {
             if (obj.type === 'donut') {
-                ctx.font = "50px Arial"; ctx.fillText("🍩", obj.x, obj.y + 45);
+                ctx.font = "50px Arial"; ctx.fillText("🍩", obj.x, obj.y + 40);
             } else if (obj.type === 'spike') {
                 ctx.fillStyle = "#ff0000"; ctx.beginPath();
                 ctx.moveTo(obj.x, obj.y + obj.h); ctx.lineTo(obj.x + obj.w / 2, obj.y);
@@ -185,15 +191,18 @@
             }
         });
 
+        particles.forEach(p => {
+            ctx.fillStyle = "#A52A2A";
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        });
+
         // HOMERO
         ctx.save();
-        let displayW = player.w;
-        let displayH = player.h;
         if(level === 4 && player.side === -1) {
-            ctx.translate(player.x + displayW/2, player.y + displayH/2); ctx.scale(1, -1);
-            ctx.font = `${displayH}px Arial`; ctx.fillText("🏃‍♂️", -displayW/2, displayH/2);
+            ctx.translate(player.x + player.w/2, player.y + player.h/2); ctx.scale(1, -1);
+            ctx.font = `${player.h}px Arial`; ctx.fillText("🏃‍♂️", -player.w/2, player.h/2);
         } else {
-            ctx.font = `${displayH}px Arial`; ctx.fillText("🏃‍♂️", player.x, player.y + displayH - 5);
+            ctx.font = `${player.h}px Arial`; ctx.fillText("🏃‍♂️", player.x, player.y + player.h - 5);
         }
         ctx.restore();
         ctx.restore();
@@ -221,7 +230,7 @@
 
     function win() {
         active = false; level++; if(level > 5) level = 1;
-        document.getElementById('m-title').innerText = "¡BIEN HECHO!";
+        document.getElementById('m-title').innerText = "¡EXCELENTE!";
         document.getElementById('overlay').style.display = "flex";
     }
 
