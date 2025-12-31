@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Homer Odyssey 25 - 5 Unique Levels</title>
+    <title>Homer Odyssey - Kids Edition</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
         #game-wrap { position: relative; width: 100vw; height: 100vh; background: #050510; }
@@ -14,8 +14,8 @@
 
         #action-btn { 
             position: absolute; bottom: 220px; right: 30px; 
-            width: 120px; height: 120px; background: rgba(255, 215, 0, 0.3); 
-            border: 4px solid #FFD700; border-radius: 50%; 
+            width: 120px; height: 120px; background: rgba(255, 215, 0, 0.4); 
+            border: 5px solid #FFD700; border-radius: 50%; 
             display: flex; justify-content: center; align-items: center; 
             font-size: 50px; z-index: 100; touch-action: none;
         }
@@ -40,8 +40,8 @@
 
     <div id="overlay">
         <h1 id="m-title">HOMER DASH</h1>
-        <p id="m-desc">Iniciando...</p>
-        <button class="start-btn" onclick="init()">EMPEZAR</button>
+        <p id="m-desc">¡Diviértete!</p>
+        <button class="start-btn" onclick="init()">JUGAR</button>
     </div>
 </div>
 
@@ -50,7 +50,7 @@
     const ctx = canvas.getContext('2d');
     
     let level = 1, donuts = 0, lives = 3, active = false, frame = 0;
-    let player = { x: 50, y: 0, w: 50, h: 60, vy: 0, jumps: 0, g: 0.7, speed: 6, side: 1, dashCD: 0 };
+    let player = { x: 50, y: 0, w: 50, h: 60, vy: 0, jumps: 0, g: 0.7, speed: 6, side: 1, isGiant: false };
     let objects = [];
     let isPressing = false;
 
@@ -68,12 +68,12 @@
         player.vy = 0; 
         player.jumps = 0; 
         player.side = 1;
+        player.isGiant = false;
         player.speed = (lvl === 5) ? 9 : 6;
 
         const btn = document.getElementById('action-btn');
-        // Icono dinámico según mecánica
         if(lvl === 1) btn.innerText = "⬆️";
-        if(lvl === 2) btn.innerText = "⚡";
+        if(lvl === 2) btn.innerText = "🍄";
         if(lvl === 3) btn.innerText = "🚀";
         if(lvl === 4) btn.innerText = "🔄";
         if(lvl === 5) btn.innerText = "🏃";
@@ -83,25 +83,24 @@
     }
 
     function spawnElement(x) {
-        // DONAS SIEMPRE GRANDES
         objects.push({ x: x + 150, y: canvas.height - 300, w: 50, h: 50, type: 'donut' });
 
-        if (level === 1) { // PICOS
+        if (level === 1) { 
             objects.push({ x: x, y: canvas.height - 160, w: 60, h: 60, type: 'spike' });
         } 
-        else if (level === 2) { // NUEVO: LASERES VERTICALES (Para Dash)
-            objects.push({ x: x, y: 0, w: 30, h: canvas.height - 100, type: 'hazard' });
+        else if (level === 2) { // MUROS DE LADRILLO (Para romper siendo gigante)
+            objects.push({ x: x, y: canvas.height - 220, w: 50, h: 120, type: 'brick' });
         }
-        else if (level === 3) { // FLY MODE
+        else if (level === 3) { 
             let gap = 280;
             let topH = 50 + Math.random() * 200;
             objects.push({ x: x, y: 0, w: 60, h: topH, type: 'hazard' });
             objects.push({ x: x, y: topH + gap, w: 60, h: canvas.height, type: 'hazard' });
         }
-        else if (level === 4) { // GRAVEDAD
+        else if (level === 4) { 
             objects.push({ x: x, y: (x % 900 === 0) ? canvas.height - 160 : 100, w: 60, h: 60, type: 'hazard' });
         }
-        else if (level === 5) { // VELOCIDAD FINAL
+        else if (level === 5) { 
             objects.push({ x: x, y: canvas.height - 160, w: 40, h: 60, type: 'hazard' });
         }
     }
@@ -110,26 +109,29 @@
         if(!active) return;
         frame++;
         player.x += player.speed;
-        if(player.dashCD > 0) player.dashCD--;
 
-        // MECÁNICAS
-        if (level === 3) { 
+        // NIVEL 2: GIGANTE
+        if(level === 2) {
+            player.isGiant = isPressing;
+            player.y = player.isGiant ? canvas.height - 230 : canvas.height - 160;
+            player.h = player.isGiant ? 130 : 60;
+            player.w = player.isGiant ? 100 : 50;
+        } else if (level === 3) { 
             if(isPressing) player.vy = -7; else player.vy += 0.5;
             player.y += player.vy;
         } else if (level === 4) { 
             player.vy += (0.8 * player.side);
             player.y += player.vy;
-        } else if (level === 2) {
-            // Nivel 2 no tiene gravedad, Homero flota en línea recta
-            player.y = canvas.height - 160;
         } else { 
             player.vy += player.g;
             player.y += player.vy;
         }
 
         const groundY = canvas.height - 100;
-        if (player.y + player.h > groundY) {
-            player.y = groundY - player.h; player.vy = 0; player.jumps = 0;
+        if (level !== 2) {
+            if (player.y + player.h > groundY) {
+                player.y = groundY - player.h; player.vy = 0; player.jumps = 0;
+            }
         }
         if (player.y < 0) { player.y = 0; player.vy = 0; }
 
@@ -141,6 +143,9 @@
                     donuts++; objects.splice(i, 1);
                     document.getElementById('txt-donuts').innerText = donuts + "/10";
                     if(donuts >= 10) win();
+                } else if (obj.type === 'brick') {
+                    if(player.isGiant) { objects.splice(i, 1); } // Rompe el muro
+                    else { die(); } // Muere por pequeño
                 } else { die(); }
             }
         });
@@ -152,8 +157,7 @@
     }
 
     function render() {
-        // Fondo cambia según nivel para diferenciar
-        const bgColors = ["#050510", "#001a1a", "#1a0000", "#1a0a00", "#0a1a0a"];
+        const bgColors = ["#050510", "#2a0a0a", "#051a1a", "#1a0a00", "#1a1a1a"];
         ctx.fillStyle = bgColors[level-1];
         ctx.fillRect(0,0,canvas.width, canvas.height);
         
@@ -168,29 +172,28 @@
 
         objects.forEach(obj => {
             if (obj.type === 'donut') {
-                ctx.font = "50px Arial";
-                ctx.fillText("🍩", obj.x, obj.y + 45);
+                ctx.font = "50px Arial"; ctx.fillText("🍩", obj.x, obj.y + 45);
             } else if (obj.type === 'spike') {
-                ctx.fillStyle = "#ff0000";
-                ctx.beginPath();
-                ctx.moveTo(obj.x, obj.y + obj.h);
-                ctx.lineTo(obj.x + obj.w / 2, obj.y);
-                ctx.lineTo(obj.x + obj.w, obj.y + obj.h);
-                ctx.fill();
+                ctx.fillStyle = "#ff0000"; ctx.beginPath();
+                ctx.moveTo(obj.x, obj.y + obj.h); ctx.lineTo(obj.x + obj.w / 2, obj.y);
+                ctx.lineTo(obj.x + obj.w, obj.y + obj.h); ctx.fill();
+            } else if (obj.type === 'brick') {
+                ctx.fillStyle = "#A52A2A"; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+                ctx.strokeStyle = "white"; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
             } else {
-                ctx.fillStyle = (level === 2) ? "#00FFFF" : "#ff4444"; // Laser cian en N2
-                ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+                ctx.fillStyle = "#ff4444"; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
             }
         });
 
-        ctx.font = "60px Arial";
+        // HOMERO
         ctx.save();
+        let displayW = player.w;
+        let displayH = player.h;
         if(level === 4 && player.side === -1) {
-            ctx.translate(player.x + 25, player.y + 30);
-            ctx.scale(1, -1);
-            ctx.fillText("🏃‍♂️", -25, 30);
+            ctx.translate(player.x + displayW/2, player.y + displayH/2); ctx.scale(1, -1);
+            ctx.font = `${displayH}px Arial`; ctx.fillText("🏃‍♂️", -displayW/2, displayH/2);
         } else {
-            ctx.fillText("🏃‍♂️", player.x, player.y + 55);
+            ctx.font = `${displayH}px Arial`; ctx.fillText("🏃‍♂️", player.x, player.y + displayH - 5);
         }
         ctx.restore();
         ctx.restore();
@@ -201,32 +204,24 @@
     const btn = document.getElementById('action-btn');
     btn.ontouchstart = (e) => {
         e.preventDefault(); isPressing = true;
-        
         if (level === 1 || level === 5) {
             if (player.jumps < 2) { player.vy = -16; player.jumps++; }
+        } else if (level === 4) { 
+            player.side *= -1; player.vy = 0; 
         }
-        else if (level === 2) {
-            if (player.dashCD === 0) { 
-                player.x += 180; // Teletransporte hacia adelante
-                player.dashCD = 30; // Tiempo de espera para el próximo dash
-            }
-        }
-        else if (level === 4) { player.side *= -1; player.vy = 0; }
     };
     btn.ontouchend = () => isPressing = false;
 
     function die() {
-        active = false; lives--;
-        document.getElementById('txt-lives').innerText = lives;
+        active = false; lives--; document.getElementById('txt-lives').innerText = lives;
         document.getElementById('overlay').style.display = "flex";
         if(lives <= 0) { level = 1; lives = 3; document.getElementById('m-title').innerText = "GAME OVER"; }
         else { document.getElementById('m-title').innerText = "¡D'OH!"; }
     }
 
     function win() {
-        active = false; level++;
-        if(level > 5) level = 1;
-        document.getElementById('m-title').innerText = "¡NIVEL LOGRADO!";
+        active = false; level++; if(level > 5) level = 1;
+        document.getElementById('m-title').innerText = "¡BIEN HECHO!";
         document.getElementById('overlay').style.display = "flex";
     }
 
