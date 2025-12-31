@@ -3,211 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Homer Odyssey 25 Niveles - Fix Final</title>
+    <title>Homer Dash 25 - NIVELES 1-5</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
-        #game-wrap { position: relative; width: 100vw; height: 100vh; background: #000; }
-        canvas { display: block; width: 100%; height: 100%; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #0a0a0a; }
+        canvas { display: block; }
 
+        /* UI */
         #hud { position: absolute; top: 40px; width: 100%; display: flex; justify-content: space-around; 
-               color: #00FF00; font-weight: bold; font-size: 22px; z-index: 10; pointer-events: none; }
+               color: #FFD700; font-size: 20px; z-index: 10; pointer-events: none; text-shadow: 2px 2px #000; }
 
-        /* CONTROLES EN POSICIÓN SEGURA (Muy arriba) */
-        .controls { position: absolute; bottom: 250px; width: 100%; pointer-events: none; z-index: 100; }
-        .btn { 
-            position: absolute; width: 95px; height: 95px; 
-            background: rgba(255, 255, 255, 0.1); border: 2px solid #FFD700; 
-            border-radius: 50%; display: flex; justify-content: center; align-items: center; 
-            font-size: 45px; color: white; pointer-events: auto; -webkit-tap-highlight-color: transparent;
+        /* CONTROL ÚNICO (DERECHA Y ELEVADO) */
+        #jump-zone { 
+            position: absolute; bottom: 200px; right: 30px; 
+            width: 120px; height: 120px; background: rgba(255, 215, 0, 0.2); 
+            border: 4px solid #FFD700; border-radius: 50%; 
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 40px; color: white; z-index: 100; touch-action: none;
         }
-        #btn-left { left: 20px; }
-        #btn-right { left: 130px; }
-        #btn-jump { right: 20px; width: 110px; height: 110px; border-width: 4px; }
 
-        #msg-box { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-                   background: rgba(0,0,0,0.95); display: flex; flex-direction: column; 
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+                   background: rgba(0,0,0,0.9); display: flex; flex-direction: column; 
                    justify-content: center; align-items: center; color: white; z-index: 200; text-align: center; }
-        .start-btn { padding: 20px 60px; font-size: 24px; background: #FFD700; border: none; border-radius: 15px; font-weight: bold; color: #000; }
+        
+        .btn-start { padding: 20px 50px; font-size: 24px; background: #FFD700; border: none; border-radius: 15px; font-weight: bold; color: #000; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="game-wrap">
+<div id="game-container">
     <div id="hud">
-        <div>NIVEL: <span id="txt-lvl">1</span></div>
-        <div>⏰: <span id="txt-score">0</span>/10</div>
-        <div>❤️: <span id="txt-lives">3</span></div>
+        <div>NIVEL: <span id="lvl-txt">1</span></div>
+        <div>DISTANCIA: <span id="dist-txt">0</span>%</div>
     </div>
 
-    <canvas id="screen"></canvas>
+    <canvas id="gameCanvas"></canvas>
+    <div id="jump-zone">⬆️</div>
 
-    <div class="controls">
-        <div class="btn" id="btn-left">⬅️</div>
-        <div class="btn" id="btn-right">➡️</div>
-        <div class="btn" id="btn-jump">🔘</div>
-    </div>
-
-    <div id="msg-box">
-        <h1 id="m-title">HOMER RUN 25</h1>
-        <p id="m-desc">Velocidad Lenta - Escalones de a 1</p>
-        <button class="start-btn" onclick="init()">EMPEZAR JUEGO</button>
+    <div id="overlay">
+        <h1 id="title">HOMER DASH</h1>
+        <p id="desc">Mecánica Geometry Dash: ¡Solo salta!</p>
+        <button class="btn-start" onclick="startLevel()">EMPEZAR</button>
     </div>
 </div>
 
 <script>
-    const canvas = document.getElementById('screen');
+    const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    let level = 1, score = 0, lives = 3, active = false, frame = 0;
-    let player = { x: 0, y: 0, w: 45, h: 55, vx: 0, vy: 0, jumpCount: 0, speed: 4.5 };
-    let inputs = { L: false, R: false };
-    let items = [], bombs = [], blocks = [];
+    let level = 1, active = false, frame = 0;
+    let player = { x: 100, y: 0, w: 50, h: 50, vy: 0, gravity: 0.6, jumpPower: -13, grounded: false };
+    let obstacles = [], items = [], platforms = [];
+    let levelLength = 5000; // Pixeles de largo del nivel
+    let cameraX = 0;
 
-    function setup() {
+    function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
     }
-    window.addEventListener('resize', setup);
-    setup();
+    window.addEventListener('resize', resize);
+    resize();
 
-    function resetLvl() {
-        score = 0; items = []; bombs = []; blocks = []; frame = 0;
-        document.getElementById('txt-lvl').innerText = level;
-        document.getElementById('txt-score').innerText = "0/10";
-        player.x = canvas.width / 2 - 22;
-        player.y = canvas.height - 150;
-        player.vx = player.vy = 0;
-
-        // --- LÓGICA DE NIVELES DIFERENCIADOS ---
-        if (level % 2 === 0) { // NIVELES PARES (Escalada Vertical)
-            // GENERACIÓN DE 1 ESCALÓN ÚNICO CON DISTANCIA FIJA
-            for(let i=0; i<10; i++) {
-                blocks.push({
-                    x: 40 + Math.random()*(canvas.width - 150),
-                    y: canvas.height - (i * 190), // Distancia de 190px entre cada uno
-                    w: 120, h: 20
-                });
+    function buildLevel(num) {
+        obstacles = []; platforms = []; items = [];
+        cameraX = 0; player.x = 100; player.vy = 0;
+        
+        const spacing = 400;
+        for(let i = 1; i < 15; i++) {
+            let x = i * spacing;
+            
+            if(num === 1) { // NIVEL 1: Introducción (Solo saltos básicos)
+                obstacles.push({x: x, y: canvas.height - 95, w: 40, h: 50, type: 'spike'});
+            } 
+            else if(num === 2) { // NIVEL 2: Plataformas (Escalones de a 1)
+                platforms.push({x: x, y: canvas.height - 200, w: 150, h: 20});
+                obstacles.push({x: x + 60, y: canvas.height - 250, w: 30, h: 30, type: 'fire'});
             }
-        } else { // NIVELES IMPARES (Carrera Lateral)
-            // No hay bloques, solo suelo
+            else if(num === 3) { // NIVEL 3: El Techo (Obstáculos arriba)
+                obstacles.push({x: x, y: canvas.height - 95, w: 40, h: 50, type: 'spike'});
+                obstacles.push({x: x + 200, y: canvas.height - 300, w: 100, h: 20, type: 'roof'});
+            }
+            else if(num === 4) { // NIVEL 4: Saltos Dobles (Plataformas altas)
+                platforms.push({x: x, y: canvas.height - 180, w: 120, h: 20});
+                platforms.push({x: x + 250, y: canvas.height - 320, w: 120, h: 20});
+            }
+            else if(num === 5) { // NIVEL 5: Caos (Velocidad y Gravedad leve)
+                obstacles.push({x: x, y: canvas.height - 95, w: 50, h: 80, type: 'wall'});
+                items.push({x: x + 200, y: canvas.height - 250});
+            }
         }
     }
 
-    function loop() {
+    function update() {
         if(!active) return;
-        frame++;
+        
+        // Movimiento automático hacia adelante (Lento)
+        player.x += 5; 
+        cameraX = player.x - 100;
 
-        // Movimiento Lento y Fluido
-        if(inputs.L) player.vx = -player.speed;
-        else if(inputs.R) player.vx = player.speed;
-        else player.vx = 0;
-
-        player.vy += 0.5; // Gravedad reducida (más lento)
-        player.x += player.vx;
+        // Gravedad y Salto
+        player.vy += player.gravity;
         player.y += player.vy;
 
-        // --- COMPORTAMIENTO SEGÚN NIVEL ---
-        if(level % 2 === 0) { // MODO ESCALADA
-            if(player.y < canvas.height * 0.45) {
-                let diff = (canvas.height * 0.45) - player.y;
-                player.y = canvas.height * 0.45;
-                blocks.forEach(b => {
-                    b.y += diff;
-                    if(b.y > canvas.height) { 
-                        b.y -= (blocks.length * 190); // Se va arriba con distancia exacta
-                        b.x = 40 + Math.random()*(canvas.width - 150);
-                    }
-                });
-                items.forEach(it => it.y += diff);
-                bombs.forEach(bo => bo.y += diff);
-            }
-            if(player.y > canvas.height) hurt(); // Caerse mata
-            // Bombas caen despacio
-            if(frame % 150 === 0) bombs.push({x: Math.random()*canvas.width, y: -50, vy: 2 + (level * 0.1), type: 'fall'});
-        } else { // MODO CARRERA
-            if(player.y > canvas.height - 100) { player.y = canvas.height-100; player.vy = 0; player.jumpCount = 0; }
-            // Bombas vienen de lado despacio
-            if(frame % 180 === 0) bombs.push({x: canvas.width, y: canvas.height-90, vx: -3 - (level * 0.2), type: 'side'});
+        // Suelo
+        if(player.y > canvas.height - 95) {
+            player.y = canvas.height - 95;
+            player.vy = 0;
+            player.grounded = true;
+        } else {
+            player.grounded = false;
         }
 
-        // Colisión Plataformas (Escalón único)
-        blocks.forEach(b => {
-            if(player.x + player.w > b.x && player.x < b.x + b.w && 
-               player.y + player.h > b.y && player.y + player.h < b.y + b.h + 10 && player.vy > 0) {
-                player.y = b.y - player.h; player.vy = 0; player.jumpCount = 0;
+        // Colisión Plataformas (Escalones de a 1)
+        platforms.forEach(p => {
+            if(player.x + player.w > p.x && player.x < p.x + p.w &&
+               player.y + player.h > p.y && player.y + player.h < p.y + 15 && player.vy > 0) {
+                player.y = p.y - player.h;
+                player.vy = 0;
+                player.grounded = true;
             }
         });
 
-        // Relojes Infinitos (Uno a la vez, lento)
-        if(items.length < 1) items.push({x: 50 + Math.random()*(canvas.width-100), y: -50, vy: 2});
-        items.forEach((it, i) => {
-            it.y += it.vy;
-            if(Math.hypot(player.x - it.x, player.y - it.y) < 55) {
-                score++; items.splice(i, 1);
-                document.getElementById('txt-score').innerText = score + "/10";
-                if(score >= 10) win();
+        // Colisión Obstáculos (Muerte)
+        obstacles.forEach(ob => {
+            if(player.x < ob.x + ob.w && player.x + player.w > ob.x &&
+               player.y < ob.y + ob.h && player.y + player.h > ob.y) {
+                die();
             }
-            if(it.y > canvas.height) items.splice(i, 1);
         });
 
-        // Bombas (Muerte)
-        bombs.forEach((bo, i) => {
-            if(bo.type === 'fall') bo.y += bo.vy; else bo.x += bo.vx;
-            if(Math.hypot(player.x - bo.x, player.y - bo.y) < 45) { hurt(); bombs.splice(i, 1); }
-            if(bo.y > canvas.height || bo.x < -50) bombs.splice(i, 1);
-        });
-
-        if(player.x < 0) player.x = 0;
-        if(player.x > canvas.width - player.w) player.x = canvas.width - player.w;
-
-        render();
-        requestAnimationFrame(loop);
+        // Progreso
+        let progress = Math.min(Math.floor((player.x / levelLength) * 100), 100);
+        document.getElementById('dist-txt').innerText = progress;
+        if(progress >= 100) win();
     }
 
-    function render() {
-        // Fondos que cambian según el nivel (Para que no parezca igual)
-        let hue = (level * 50) % 360;
-        ctx.fillStyle = `hsl(${hue}, 20%, 5%)`;
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Fondo
+        ctx.fillStyle = level % 2 === 0 ? "#1a001a" : "#001a1a";
         ctx.fillRect(0,0,canvas.width, canvas.height);
 
-        if(level % 2 !== 0) { ctx.fillStyle = "#00FF00"; ctx.fillRect(0, canvas.height-45, canvas.width, 45); }
-        ctx.fillStyle = "#00BFFF"; blocks.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
-        
-        ctx.font = "45px Arial";
-        items.forEach(it => ctx.fillText("⏰", it.x, it.y));
-        bombs.forEach(bo => ctx.fillText("🔥", bo.x, bo.y + 40));
-        
-        ctx.font = "60px Arial";
-        ctx.fillText("🏃‍♂️", player.x, player.y + 55);
-    }
+        ctx.save();
+        ctx.translate(-cameraX, 0);
 
-    // CONTROLES HOLD
-    const bL = document.getElementById('btn-left'), bR = document.getElementById('btn-right'), bJ = document.getElementById('btn-jump');
-    bL.ontouchstart = (e) => { e.preventDefault(); inputs.L = true; };
-    bL.ontouchend = () => inputs.L = false;
-    bR.ontouchstart = (e) => { e.preventDefault(); inputs.R = true; };
-    bR.ontouchend = () => inputs.R = false;
-    bJ.ontouchstart = (e) => { e.preventDefault(); if(player.jumpCount < 2) { player.vy = -13; player.jumpCount++; } };
+        // Dibujar Suelo
+        ctx.fillStyle = "#333";
+        ctx.fillRect(0, canvas.height - 45, levelLength + 1000, 45);
+        ctx.strokeStyle = "#FFD700";
+        ctx.strokeRect(0, canvas.height - 45, levelLength + 1000, 2);
 
-    function hurt() {
-        lives--; document.getElementById('txt-lives').innerText = lives;
-        if(lives <= 0) { 
-            active = false; 
-            document.getElementById('msg-box').style.display = "flex"; 
-            document.getElementById('m-title').innerText = "GAME OVER"; 
-            level=1; lives=3;
-        } else { 
-            player.x = canvas.width/2; player.y = canvas.height - 250; player.vy = 0; 
+        // Dibujar Obstáculos
+        ctx.fillStyle = "#ff4444";
+        obstacles.forEach(ob => {
+            if(ob.type === 'spike') {
+                ctx.beginPath();
+                ctx.moveTo(ob.x, ob.y + ob.h);
+                ctx.lineTo(ob.x + ob.w/2, ob.y);
+                ctx.lineTo(ob.x + ob.w, ob.y + ob.h);
+                ctx.fill();
+            } else {
+                ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+            }
+        });
+
+        // Dibujar Plataformas
+        ctx.fillStyle = "#00FF00";
+        platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+
+        // Dibujar a Homero
+        ctx.font = "50px Arial";
+        ctx.fillText("🏃‍♂️", player.x, player.y + 45);
+
+        ctx.restore();
+        
+        if(active) {
+            update();
+            requestAnimationFrame(draw);
         }
     }
 
-    function win() { 
-        active = false; level++; 
-        document.getElementById('msg-box').style.display = "flex"; 
-        document.getElementById('m-title').innerText = "¡NIVEL LOGRADO!"; 
+    function startLevel() {
+        document.getElementById('overlay').style.display = "none";
+        document.getElementById('lvl-txt').innerText = level;
+        buildLevel(level);
+        active = true;
+        draw();
     }
-    
-    function init() { document.getElementById('msg-box').style.display = "none"; resetLvl(); active = true; loop(); }
+
+    function die() {
+        active = false;
+        document.getElementById('overlay').style.display = "flex";
+        document.getElementById('title').innerText = "¡D'OH!";
+        document.getElementById('desc').innerText = "Nivel " + level + " fallido.";
+    }
+
+    function win() {
+        active = false;
+        level++;
+        document.getElementById('overlay').style.display = "flex";
+        document.getElementById('title').innerText = "¡EXCELENTE!";
+        document.getElementById('desc').innerText = "Pasaste al nivel " + level;
+    }
+
+    // CONTROL DE SALTO
+    const jumpBtn = document.getElementById('jump-zone');
+    const handleJump = (e) => {
+        e.preventDefault();
+        if(player.grounded) {
+            player.vy = player.jumpPower;
+            player.grounded = false;
+        }
+    };
+    jumpBtn.addEventListener('touchstart', handleJump);
+    window.addEventListener('keydown', (e) => { if(e.code === 'Space') handleJump(e); });
+
 </script>
 </body>
 </html>
