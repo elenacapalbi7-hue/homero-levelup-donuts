@@ -40,7 +40,7 @@
 
     <div id="overlay">
         <h1 id="m-title">HOMER DASH</h1>
-        <p id="m-desc">Saltos sincronizados y Donas grandes</p>
+        <p id="m-desc">Cargando...</p>
         <button class="start-btn" onclick="init()">EMPEZAR</button>
     </div>
 </div>
@@ -63,38 +63,43 @@
         document.getElementById('txt-donuts').innerText = "0/10";
         document.getElementById('txt-lvl').innerText = lvl;
         
-        player.x = 80; 
+        player.x = 100; 
         player.y = canvas.height - 160; 
         player.vy = 0; 
         player.jumps = 0; 
         player.side = 1;
-        player.speed = 6; // Velocidad fija para que los saltos siempre den la misma distancia
+        player.speed = (lvl === 5) ? 9 : 6;
 
-        // Generar 10 secciones con distancias seguras (450px entre obstáculos)
-        for(let i=1; i<15; i++) spawnElement(i * 450);
+        const btn = document.getElementById('action-btn');
+        btn.innerText = (lvl === 3) ? "🚀" : (lvl === 4 ? "🔄" : "⬆️");
+
+        // Generar elementos iniciales con margen de seguridad
+        // El nivel 3 empieza a spawnear obstáculos mucho después
+        let startX = (lvl === 3) ? 1200 : 600; 
+        for(let i=0; i<15; i++) spawnElement(startX + (i * 450));
     }
 
     function spawnElement(x) {
-        // DONAS GRANDES (Ajustadas a 50px)
-        objects.push({ x: x + 150, y: canvas.height - 250, w: 50, h: 50, type: 'donut' });
+        // DONAS (Grandes y siempre visibles)
+        objects.push({ x: x + 150, y: canvas.height - 300, w: 50, h: 50, type: 'donut' });
 
-        if (level === 1) { // NIVEL 1: BLOQUES
-            objects.push({ x: x, y: canvas.height - 150, w: 60, h: 50, type: 'hazard' });
+        if (level === 1) { // NIVEL 1: PICOS SOBRE EL SUELO
+            objects.push({ x: x, y: canvas.height - 160, w: 60, h: 60, type: 'spike' });
         } 
-        else if (level === 2) { // NIVEL 2: PINCHOS (Geometry Dash)
-            objects.push({ x: x, y: canvas.height - 100, w: 60, h: 60, type: 'spike' });
+        else if (level === 2) { // NIVEL 2: PLATAFORMAS (ABISMO)
+            objects.push({ x: x, y: canvas.height - 200, w: 200, h: 30, type: 'platform' });
         }
-        else if (level === 3) { // NIVEL 3: FLY MODE (Nave)
-            let gap = 250;
-            let topH = 100 + Math.random() * 200;
+        else if (level === 3) { // NIVEL 3: FLY MODE (NAVE)
+            let gap = 280;
+            let topH = 50 + Math.random() * 200;
             objects.push({ x: x, y: 0, w: 60, h: topH, type: 'hazard' });
             objects.push({ x: x, y: topH + gap, w: 60, h: canvas.height, type: 'hazard' });
         }
-        else if (level === 4) { // NIVEL 4: GRAVEDAD INVERSA
-            objects.push({ x: x, y: (i%2==0) ? canvas.height - 150 : 100, w: 50, h: 50, type: 'hazard' });
+        else if (level === 4) { // NIVEL 4: GRAVEDAD
+            objects.push({ x: x, y: (x % 900 === 0) ? canvas.height - 160 : 100, w: 60, h: 60, type: 'hazard' });
         }
-        else if (level === 5) { // NIVEL 5: ESCALONES (Sincronizados)
-            objects.push({ x: x, y: canvas.height - 220, w: 180, h: 30, type: 'platform' });
+        else if (level === 5) { // NIVEL 5: VELOCIDAD FINAL
+            objects.push({ x: x, y: canvas.height - 160, w: 40, h: 60, type: 'hazard' });
         }
     }
 
@@ -103,7 +108,6 @@
         frame++;
         player.x += player.speed;
 
-        // Mecánicas
         if (level === 3) { 
             if(isPressing) player.vy = -7; else player.vy += 0.5;
             player.y += player.vy;
@@ -115,14 +119,22 @@
             player.y += player.vy;
         }
 
-        // Suelo y Techo
         const groundY = canvas.height - 100;
-        if (player.y + player.h > groundY) {
-            player.y = groundY - player.h; player.vy = 0; player.jumps = 0;
+        
+        // Lógica de muerte por caída (Solo en nivel 2)
+        if (level === 2) {
+            if (player.y > canvas.height) die();
+        } else {
+            if (player.y + player.h > groundY) {
+                player.y = groundY - player.h; player.vy = 0; player.jumps = 0;
+            }
         }
-        if (player.y < 0) { player.y = 0; player.vy = 0; }
+        
+        if (player.y < 0 && level !== 4) { player.y = 0; player.vy = 0; }
+        if (level === 4 && player.y < 100 && player.side === -1) {
+            player.y = 100; player.vy = 0; player.jumps = 0;
+        }
 
-        // Colisiones
         objects.forEach((obj, i) => {
             if (player.x < obj.x + obj.w && player.x + player.w > obj.x &&
                 player.y < obj.y + obj.h && player.y + player.h > obj.y) {
@@ -142,48 +154,57 @@
         });
 
         if (frame % 60 === 0) {
-            let lastX = objects[objects.length-1].x;
+            let lastX = objects.length > 0 ? objects[objects.length-1].x : player.x + 500;
             spawnElement(lastX + 450);
         }
     }
 
     function render() {
-        ctx.fillStyle = (level === 2) ? "#1a0000" : "#050510";
+        ctx.fillStyle = "#050510";
         ctx.fillRect(0,0,canvas.width, canvas.height);
         
         ctx.save();
-        ctx.translate(-player.x + 80, 0);
+        ctx.translate(-player.x + 100, 0);
 
-        // Suelo
-        ctx.fillStyle = "#222";
-        ctx.fillRect(player.x - 200, canvas.height - 100, canvas.width + 2000, 100);
-        ctx.fillStyle = "#FFD700";
-        ctx.fillRect(player.x - 200, canvas.height - 102, canvas.width + 2000, 3);
+        // Suelo (No se dibuja en nivel 2 para el efecto abismo)
+        if (level !== 2) {
+            ctx.fillStyle = "#222";
+            ctx.fillRect(player.x - 500, canvas.height - 100, canvas.width + 3000, 100);
+            ctx.fillStyle = "#FFD700";
+            ctx.fillRect(player.x - 500, canvas.height - 102, canvas.width + 3000, 3);
+            if(level === 4) ctx.fillRect(player.x - 500, 100, canvas.width + 3000, 3);
+        }
 
         objects.forEach(obj => {
             if (obj.type === 'donut') {
-                ctx.font = "50px Arial"; // Donas más grandes
-                ctx.fillText("🍩", obj.x, obj.y + 40);
-            }
-            else if (obj.type === 'hazard' || obj.type === 'platform') {
-                ctx.fillStyle = (obj.type === 'platform') ? "#FFD700" : "#ff4444";
-                ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-                ctx.strokeStyle = "white"; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
-            }
-            else if (obj.type === 'spike') {
+                ctx.font = "50px Arial";
+                ctx.fillText("🍩", obj.x, obj.y + 45);
+            } else if (obj.type === 'spike') {
                 ctx.fillStyle = "#ff0000";
                 ctx.beginPath();
                 ctx.moveTo(obj.x, obj.y + obj.h);
                 ctx.lineTo(obj.x + obj.w / 2, obj.y);
                 ctx.lineTo(obj.x + obj.w, obj.y + obj.h);
                 ctx.fill();
+                ctx.strokeStyle = "white"; ctx.stroke();
+            } else {
+                ctx.fillStyle = (obj.type === 'platform') ? "#FFD700" : "#ff4444";
+                ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
             }
         });
 
         ctx.font = "60px Arial";
-        ctx.fillText("🏃‍♂️", player.x, player.y + 55);
+        ctx.save();
+        if(level === 4 && player.side === -1) {
+            ctx.translate(player.x + 25, player.y + 30);
+            ctx.scale(1, -1);
+            ctx.fillText("🏃‍♂️", -25, 30);
+        } else {
+            ctx.fillText("🏃‍♂️", player.x, player.y + 55);
+        }
         ctx.restore();
 
+        ctx.restore();
         if(active) { update(); requestAnimationFrame(render); }
     }
 
@@ -191,7 +212,7 @@
     btn.ontouchstart = (e) => {
         e.preventDefault(); isPressing = true;
         if (level === 4) { player.side *= -1; player.vy = 0; }
-        else if (player.jumps < 2) { player.vy = -15; player.jumps++; }
+        else if (player.jumps < 2) { player.vy = -16; player.jumps++; }
     };
     btn.ontouchend = () => isPressing = false;
 
@@ -200,10 +221,12 @@
         document.getElementById('txt-lives').innerText = lives;
         document.getElementById('overlay').style.display = "flex";
         if(lives <= 0) { level = 1; lives = 3; document.getElementById('m-title').innerText = "GAME OVER"; }
+        else { document.getElementById('m-title').innerText = "¡D'OH!"; }
     }
 
     function win() {
         active = false; level++;
+        if(level > 5) level = 1;
         document.getElementById('m-title').innerText = "¡NIVEL LOGRADO!";
         document.getElementById('overlay').style.display = "flex";
     }
